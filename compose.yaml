@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: folio
+      POSTGRES_USER: folio
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes: ["postgres:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U folio"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    environment: &environment
+      DATABASE_URL: postgresql+psycopg://folio:${POSTGRES_PASSWORD}@db/folio
+      OPERATOR_TOKEN: ${OPERATOR_TOKEN:?Set OPERATOR_TOKEN in .env}
+      PROVIDER: ${PROVIDER:-fixture}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+    depends_on:
+      db: {condition: service_healthy}
+  api:
+    build: .
+    ports: ["127.0.0.1:8000:8000"]
+    environment: *environment
+    volumes: ["documents:/app/data/documents"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+  worker:
+    build: .
+    command: ["python", "-m", "app.worker"]
+    environment: *environment
+    volumes: ["documents:/app/data/documents"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+volumes:
+  postgres:
+  documents:
