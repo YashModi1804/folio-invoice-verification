@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "ruff>=0.9,<1"]
+demo = ["reportlab>=5,<6"]
 
 [tool.setuptools.packages.find]
 include = ["app*"]

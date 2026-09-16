@@ -60,10 +60,11 @@ GEMINI_MODEL=your-currently-available-vision-model
 
 Select a model supported by your account's free tier. Availability, quotas, and data
 handling terms depend on the provider; Folio does not provision or enforce a free
-billing tier. No API call was made during development. The adapter uses Google's
+billing tier. The adapter uses Google's
 [generateContent API](https://ai.google.dev/api/generate-content) with image inputs,
 a JSON schema, bounded retries, and local Pydantic validation. Its contract is tested
-using mocked responses. The exact selected model still needs a live smoke test.
+using mocked responses. Gemini `gemini-3.6-flash` was also checked with 11 local
+evaluation inputs on 2026-09-16; see [live evaluation](docs/LIVE_EVALUATION.md).
 
 Unknown live cost is `null`, never a fabricated zero. Fixture cost is explicitly zero
 because there is no API call. Confidence is a model heuristic, not a calibrated
@@ -165,6 +166,7 @@ Schedule that command in your deployment if automatic expiration is required.
 
 ## Sales handoff
 
-See [the demo script](docs/DEMO.md), [verification report](docs/ACCEPTANCE.md),
+See [the live document pack and Loom plan](docs/DEMO_PACK.md),
+[the offline demo script](docs/DEMO.md), [verification report](docs/ACCEPTANCE.md),
 [SRS](SRS.md), and [build plan](BUILD_PLAN.md).
 

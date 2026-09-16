@@ -44,3 +44,10 @@ verification and explicit deployment/live-provider limitations. No GitHub remote
   explicitly prevent unsafe automatic approval.
 - Model evidence is a reviewer aid, not independently verified provenance.
 - Commit identity and remote are supplied by the user; do not invent attribution.
+
+## Follow-up commit 25 — live verification and Loom pack
+
+Use the saved local key without printing it; validate the provider adapter against
+current API behavior; generate three labeled source PDFs and four image variants;
+fetch four public Microsoft examples with provenance; record actual outcomes and
+quota limitations; keep binaries, reports, credentials and databases untracked.

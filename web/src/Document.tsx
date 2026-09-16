@@ -199,7 +199,9 @@ export default function Document({
               : review
                 ? "This record is held for review. Resolve the flagged details before approval."
                 : failed
-                  ? humanize(job.error ?? "Record rejected by reviewer")
+                  ? job.error === "PROVIDER_RATE_LIMITED"
+                    ? "Gemini's request quota is exhausted. Check the provider quota and retry the upload after it resets. No financial record was approved."
+                    : humanize(job.error ?? "Record rejected by reviewer")
                   : "The record is approved. Its original extraction and verification history are preserved."}
           </p>
           {pending && (

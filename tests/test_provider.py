@@ -3,7 +3,7 @@ import pytest
 from pydantic import SecretStr
 
 from app.config import settings
-from app.gemini import GeminiProvider
+from app.gemini import GeminiProvider, output_schema
 from app.providers import ProviderError
 from app.samples import sample_invoice
 
@@ -25,7 +25,9 @@ def reply(text, finish="STOP"):
 def test_schema_and_usage_are_preserved(monkeypatch, live_settings):
     def post(self, url, **kwargs):
         assert kwargs["headers"]["x-goog-api-key"] == "test-key"
-        assert "responseJsonSchema" in kwargs["json"]["generationConfig"]
+        output = kwargs["json"]["generationConfig"]["responseFormat"]["text"]
+        assert output["mimeType"] == "APPLICATION_JSON"
+        assert output["schema"]["type"] == "object"
         assert "systemInstruction" in kwargs["json"]
         return httpx.Response(200, json=reply(sample_invoice("clean").model_dump_json()))
 
@@ -59,7 +61,7 @@ def test_rate_limit_retries_are_bounded(monkeypatch, live_settings):
         return httpx.Response(429)
 
     monkeypatch.setattr(httpx.Client, "post", post)
-    with pytest.raises(ProviderError, match="PROVIDER_UNAVAILABLE"):
+    with pytest.raises(ProviderError, match="PROVIDER_RATE_LIMITED"):
         GeminiProvider().extract([b"image"])
     assert len(calls) == 3
 
@@ -75,3 +77,25 @@ def test_transport_timeout_is_not_blindly_replayed(monkeypatch, live_settings):
     with pytest.raises(ProviderError, match="PROVIDER_TRANSPORT_FAILURE"):
         GeminiProvider().extract([b"image"])
     assert len(calls) == 1
+
+
+def test_wire_schema_keeps_nullable_decimal_strings_without_decoder_constraints():
+    schema = output_schema()
+    amount = schema["properties"]["total_amount"]["properties"]["value"]
+    assert amount == {"anyOf": [{"type": "string"}, {"type": "null"}]}
+    assert "total_amount" in schema["required"]
+    assert "$ref" not in str(schema)
+    assert "pattern" not in str(schema)
+
+
+@pytest.mark.parametrize("value", ["NaN", "12345678901234567", "0.12345"])
+def test_local_precision_rules_survive_simplified_wire_schema(monkeypatch, live_settings, value):
+    invoice = sample_invoice("clean").model_dump(mode="json")
+    invoice["total_amount"]["value"] = value
+    import json
+
+    monkeypatch.setattr(
+        httpx.Client, "post", lambda *a, **kw: httpx.Response(200, json=reply(json.dumps(invoice)))
+    )
+    with pytest.raises(ProviderError, match="PROVIDER_INVALID_SCHEMA"):
+        GeminiProvider().extract([b"image"])

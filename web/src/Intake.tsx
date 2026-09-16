@@ -115,7 +115,7 @@ export default function Intake({
         <div className="panel-head">
           <div>
             <h2>See the guardrails at work</h2>
-            <p>Synthetic samples · Real validation and review workflow</p>
+            <p>Offline fixtures · No model call · Real validation workflow</p>
           </div>
           <ScanLine size={19} className="muted" />
         </div>

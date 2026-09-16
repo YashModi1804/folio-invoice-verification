@@ -3,7 +3,7 @@
 ## Verified locally
 
 - Python 3.12; SQLite migration and separate worker startup.
-- 51 automated tests, passing without live credentials.
+- 55 automated tests, passing without live credentials.
 - Ruff lint and formatting checks.
 - TypeScript strict compilation and Vite production build.
 - Three offline routing regression fixtures; not a live extraction benchmark.
@@ -12,6 +12,9 @@
 - Source preview and invoice review render together at the normal desktop viewport.
 - Tablet layout inspected at 900px; source and extracted data stack without overlap.
 - Browser clean sample reaches automatic approval; corrected record summary displays 1250.00.
+- Live Gemini extraction on 11 evaluation inputs, including a two-page raster scan,
+  four public Microsoft samples, and four image-format/orientation variants.
+  See [measured results and limitations](LIVE_EVALUATION.md).
 
 ## Explicit implementation choices
 
@@ -33,7 +36,8 @@
 
 ## Not yet verified
 
-- A live Gemini request with a selected model and account key.
+- Successful live browser/API-to-worker extraction after the evaluation batch;
+  the account's free-tier request quota blocked subsequent uploads (HTTP 429).
 - Extraction accuracy, confidence calibration, or live p95 latency on client documents.
 - Docker/PostgreSQL deployment; Docker is not installed in this environment.
 - Production concurrency, load, backup/restore, public-hosting hardening, or compliance.

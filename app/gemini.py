@@ -20,6 +20,39 @@ or non-invoices, and tax_inclusive when appropriate. No reasoning narrative.
 """
 
 
+def output_schema() -> dict:
+    """Project the domain contract onto Gemini's supported structural schema.
+
+    Financial precision, lengths, dates and bounds are still enforced by Pydantic
+    after extraction. Inline references and omit unsupported decoding constraints.
+    """
+    schema = Invoice.model_json_schema(mode="serialization")
+    omitted = {
+        "$defs",
+        "pattern",
+        "default",
+        "title",
+        "additionalProperties",
+        "maxItems",
+        "maxLength",
+        "minLength",
+        "maximum",
+        "minimum",
+        "format",
+    }
+
+    def project(value):
+        if isinstance(value, list):
+            return [project(item) for item in value]
+        if isinstance(value, dict):
+            if "$ref" in value:
+                return project(schema["$defs"][value["$ref"].split("/")[-1]])
+            return {key: project(item) for key, item in value.items() if key not in omitted}
+        return value
+
+    return project(schema)
+
+
 class GeminiProvider:
     def extract(self, pages: list[bytes], sample: str | None = None) -> Extraction:
         key = settings.gemini_api_key.get_secret_value()
@@ -48,8 +81,12 @@ class GeminiProvider:
                 }
             ],
             "generationConfig": {
-                "responseMimeType": "application/json",
-                "responseJsonSchema": Invoice.model_json_schema(),
+                "responseFormat": {
+                    "text": {
+                        "mimeType": "APPLICATION_JSON",
+                        "schema": output_schema(),
+                    }
+                },
                 "maxOutputTokens": 16384,
             },
         }
@@ -63,7 +100,12 @@ class GeminiProvider:
                 if response.status_code not in {429, 500, 502, 503, 504}:
                     break
                 if attempt == 2:
-                    raise ProviderError("PROVIDER_UNAVAILABLE")
+                    code = (
+                        "PROVIDER_RATE_LIMITED"
+                        if response.status_code == 429
+                        else "PROVIDER_UNAVAILABLE"
+                    )
+                    raise ProviderError(code)
                 time.sleep(2**attempt)
         if response.status_code != 200:
             raise ProviderError("PROVIDER_REQUEST_REJECTED")
