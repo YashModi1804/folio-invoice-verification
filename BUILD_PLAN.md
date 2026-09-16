@@ -27,6 +27,9 @@
 
 ## Implementation decisions
 
+Delivery status: all 24 planned slices implemented. See docs/ACCEPTANCE.md for measured
+verification and explicit deployment/live-provider limitations. No GitHub remote was used.
+
 - Working name: Folio. Single protected operator workspace.
 - Start with invoices in USD/EUR/GBP; unsupported currencies route to review.
 - React/TypeScript/Vite frontend; FastAPI/Pydantic/SQLAlchemy backend.

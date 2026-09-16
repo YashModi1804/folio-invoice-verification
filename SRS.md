@@ -174,10 +174,12 @@ from decimal import Decimal
 from typing import Literal
 from pydantic import BaseModel, Field
 
+
 class Evidence(BaseModel):
     page_number: int = Field(ge=1)
     text: str = Field(min_length=1, max_length=300)
     bbox: tuple[float, float, float, float] | None = None
+
 
 class ExtractedField(BaseModel):
     value: str | Decimal | date | None
@@ -185,11 +187,13 @@ class ExtractedField(BaseModel):
     evidence: list[Evidence] = Field(default_factory=list)
     extraction_note: str | None = Field(default=None, max_length=240)
 
+
 class LineItem(BaseModel):
     description: ExtractedField
     quantity: ExtractedField
     unit_price: ExtractedField
     line_total: ExtractedField
+
 
 class VerificationCheck(BaseModel):
     code: str
@@ -199,6 +203,7 @@ class VerificationCheck(BaseModel):
     variance: Decimal | None = None
     tolerance: Decimal | None = None
 
+
 class ProcessingTelemetry(BaseModel):
     latency_ms: int = Field(ge=0)
     input_tokens: int | None = Field(default=None, ge=0)
@@ -207,6 +212,7 @@ class ProcessingTelemetry(BaseModel):
     pricing_version: str | None = None
     provider: str
     model: str
+
 
 class ExtractionResponse(BaseModel):
     document_id: str
