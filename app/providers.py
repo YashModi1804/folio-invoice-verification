@@ -25,6 +25,14 @@ class FixtureProvider:
     def extract(self, pages: list[bytes], sample: str | None = None) -> Extraction:
         if sample is None:
             raise ProviderError("LIVE_PROVIDER_NOT_CONFIGURED")
-        return Extraction(sample_invoice(sample), "fixture", "synthetic-v1",
-                          {"input_tokens": None, "output_tokens": None,
-                           "estimated_cost_usd": "0", "pricing_version": "fixture-no-api"})
+        return Extraction(
+            sample_invoice(sample),
+            "fixture",
+            "synthetic-v1",
+            {
+                "input_tokens": None,
+                "output_tokens": None,
+                "estimated_cost_usd": "0",
+                "pricing_version": "fixture-no-api",
+            },
+        )

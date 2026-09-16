@@ -15,8 +15,11 @@ def compare(code: str, expected: Decimal | None, observed: Decimal | None) -> Ch
         return Check(code=code, state="NOT_APPLICABLE", expected=expected, observed=observed)
     variance = observed - expected
     return Check(
-        code=code, state="PASS" if abs(variance) <= CENT else "FAIL",
-        expected=expected, observed=observed, variance=variance,
+        code=code,
+        state="PASS" if abs(variance) <= CENT else "FAIL",
+        expected=expected,
+        observed=observed,
+        variance=variance,
     )
 
 
@@ -33,8 +36,12 @@ def verify(invoice: Invoice) -> list[Check]:
             complete = False
         checks.append(compare(f"LINE_{index + 1}", expected, item.line_total))
     checks.append(compare("SUBTOTAL", subtotal if complete else None, invoice.subtotal.value))
-    operands = [invoice.subtotal.value, invoice.tax_amount.value,
-                invoice.shipping_amount.value, invoice.discount_amount.value]
+    operands = [
+        invoice.subtotal.value,
+        invoice.tax_amount.value,
+        invoice.shipping_amount.value,
+        invoice.discount_amount.value,
+    ]
     total = None
     if all(value is not None for value in operands) and not invoice.tax_inclusive:
         total = rounded(operands[0] + operands[1] + operands[2] - operands[3])

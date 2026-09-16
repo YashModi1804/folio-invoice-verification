@@ -2,13 +2,21 @@ from app.domain.models import Check, Invoice
 from app.domain.verify import SUPPORTED_CURRENCIES
 
 CORE_FIELDS = (
-    "vendor_name", "invoice_number", "invoice_date", "currency", "subtotal",
-    "tax_amount", "shipping_amount", "discount_amount", "total_amount",
+    "vendor_name",
+    "invoice_number",
+    "invoice_date",
+    "currency",
+    "subtotal",
+    "tax_amount",
+    "shipping_amount",
+    "discount_amount",
+    "total_amount",
 )
 
 
-def route(invoice: Invoice, checks: list[Check], threshold: float = 0.85,
-          page_count: int = 20) -> tuple[str, list[str]]:
+def route(
+    invoice: Invoice, checks: list[Check], threshold: float = 0.85, page_count: int = 20
+) -> tuple[str, list[str]]:
     reasons = []
     for name in CORE_FIELDS:
         field = getattr(invoice, name)
@@ -20,6 +28,17 @@ def route(invoice: Invoice, checks: list[Check], threshold: float = 0.85,
             reasons.append(f"MISSING_EVIDENCE_{name.upper()}")
     if invoice.currency.value not in SUPPORTED_CURRENCIES:
         reasons.append("UNSUPPORTED_CURRENCY")
+    if any(
+        getattr(invoice, name).value is not None and getattr(invoice, name).value < 0
+        for name in ("subtotal", "tax_amount", "shipping_amount", "discount_amount", "total_amount")
+    ):
+        reasons.append("NEGATIVE_AMOUNT_REQUIRES_REVIEW")
+    if any(
+        value is not None and value < 0
+        for item in invoice.line_items
+        for value in (item.quantity, item.unit_price, item.line_total)
+    ):
+        reasons.append("NEGATIVE_LINE_REQUIRES_REVIEW")
     if invoice.ambiguous_document:
         reasons.append("MULTIPLE_OR_AMBIGUOUS_DOCUMENTS")
     if invoice.tax_inclusive:

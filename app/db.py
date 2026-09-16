@@ -1,14 +1,19 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, create_engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 from app.config import settings
 
 
 def now():
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
+
+
+def timestamp(value: datetime) -> str:
+    """SQLite drops timezone metadata; persisted timestamps are always UTC."""
+    return value.replace(tzinfo=UTC).isoformat()
 
 
 def new_id():
@@ -35,6 +40,9 @@ class Job(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    review_decision: Mapped["ReviewDecision | None"] = relationship(
+        lazy="selectin", viewonly=True, uselist=False
+    )
 
 
 class AuditEvent(Base):
@@ -59,8 +67,18 @@ class ReviewDecision(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
+class WorkerHeartbeat(Base):
+    __tablename__ = "worker_heartbeats"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
 settings.storage_dir.mkdir(parents=True, exist_ok=True)
-engine = create_engine(settings.database_url, pool_pre_ping=True,
-                       connect_args={"check_same_thread": False, "timeout": 30}
-                       if settings.database_url.startswith("sqlite") else {})
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+    connect_args={"check_same_thread": False, "timeout": 30}
+    if settings.database_url.startswith("sqlite")
+    else {},
+)
 Session = sessionmaker(engine, expire_on_commit=False)

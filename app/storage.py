@@ -7,8 +7,13 @@ from PIL import Image, UnidentifiedImageError
 from app.config import settings
 
 Image.MAX_IMAGE_PIXELS = 25_000_000
-EXTENSIONS = {".pdf": "application/pdf", ".png": "image/png",
-              ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+EXTENSIONS = {
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+}
 
 
 class DocumentError(ValueError):
@@ -45,8 +50,13 @@ def inspect(data: bytes, filename: str) -> tuple[str, int]:
         return actual, pages
     except DocumentError:
         raise
-    except (RuntimeError, ValueError, OSError, UnidentifiedImageError,
-            Image.DecompressionBombError) as exc:
+    except (
+        RuntimeError,
+        ValueError,
+        OSError,
+        UnidentifiedImageError,
+        Image.DecompressionBombError,
+    ) as exc:
         raise DocumentError("CORRUPT_DOCUMENT") from exc
 
 
@@ -57,8 +67,10 @@ def document_path(job_id: str) -> Path:
 def render(data: bytes, media_type: str) -> list[bytes]:
     if media_type == "application/pdf":
         with pymupdf.open(stream=data, filetype="pdf") as doc:
-            return [page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), alpha=False).tobytes("png")
-                    for page in doc]
+            return [
+                page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), alpha=False).tobytes("png")
+                for page in doc
+            ]
     with Image.open(BytesIO(data)) as image:
         image.thumbnail((2400, 2400))
         output = BytesIO()

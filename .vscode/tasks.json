@@ -1,8 +1,28 @@
 {
   "version": "2.0.0",
   "tasks": [
-    {"label":"Folio: start demo","type":"process","command":"${workspaceFolder}/.venv/bin/python","args":["scripts/dev.py"],"isBackground":true,"problemMatcher":[]},
-    {"label":"Folio: test","type":"process","command":"${workspaceFolder}/.venv/bin/python","args":["-m","pytest","-q"],"group":{"kind":"test","isDefault":true},"problemMatcher":[]},
-    {"label":"Folio: migrate","type":"process","command":"${workspaceFolder}/.venv/bin/alembic","args":["upgrade","head"],"problemMatcher":[]}
+    {
+      "label": "Folio: start demo",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["scripts/dev.py"],
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Folio: test",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["-m", "pytest", "-q"],
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Folio: migrate",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/alembic",
+      "args": ["upgrade", "head"],
+      "problemMatcher": []
+    }
   ]
 }

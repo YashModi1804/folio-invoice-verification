@@ -5,8 +5,9 @@ import pytest
 from app.domain.verify import compare, rounded
 
 
-@pytest.mark.parametrize("observed,state", [("10.00", "PASS"), ("10.01", "PASS"),
-                                          ("10.02", "FAIL"), ("9.98", "FAIL")])
+@pytest.mark.parametrize(
+    "observed,state", [("10.00", "PASS"), ("10.01", "PASS"), ("10.02", "FAIL"), ("9.98", "FAIL")]
+)
 def test_tolerance(observed, state):
     assert compare("TOTAL", Decimal("10"), Decimal(observed)).state == state
 

@@ -9,7 +9,7 @@ jobs:
         with: {python-version: '3.12'}
       - run: pip install -r requirements.lock
       - run: ruff check . && ruff format --check .
-      - run: pytest -q
+      - run: python -m pytest -q
       - run: python -m app.evaluate
       - run: alembic upgrade head
       - uses: actions/setup-node@v4

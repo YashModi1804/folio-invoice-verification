@@ -56,6 +56,7 @@ class Check(Contract):
 
 
 class Decision(Contract):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     action: Literal["approve", "reject"]
     note: str = Field(min_length=3, max_length=1000)
     corrected_invoice: Invoice | None = None

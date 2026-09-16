@@ -1,4 +1,5 @@
 """Start the migrated local API and worker together; Ctrl-C shuts down both."""
+
 import os
 import signal
 import subprocess
@@ -16,8 +17,10 @@ def main():
     subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=True)
     children = []
     try:
-        for args in (["-m", "app.worker"],
-                     ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"]):
+        for args in (
+            ["-m", "app.worker"],
+            ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
+        ):
             children.append(subprocess.Popen([sys.executable, *args]))
         print("Folio: http://127.0.0.1:8000 | local demo token: local-demo-only", flush=True)
         signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))

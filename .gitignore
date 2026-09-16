@@ -10,3 +10,6 @@ web/dist/
 *.egg-info/
 .DS_Store
 test-results/
+.pnpm-store/
+*.tsbuildinfo
+.tools/

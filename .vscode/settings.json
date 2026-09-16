@@ -4,5 +4,12 @@
   "python.testing.unittestEnabled": false,
   "python.testing.pytestArgs": ["tests"],
   "editor.formatOnSave": true,
-  "files.exclude": {"**/__pycache__": true, "**/.pytest_cache": true}
+  "terminal.integrated.env.osx": {
+    "PATH": "${workspaceFolder}/.tools:${env:PATH}"
+  },
+  "[python]": {"editor.defaultFormatter": "charliermarsh.ruff"},
+  "[typescript]": {"editor.defaultFormatter": "esbenp.prettier-vscode"},
+  "[typescriptreact]": {"editor.defaultFormatter": "esbenp.prettier-vscode"},
+  "[css]": {"editor.defaultFormatter": "esbenp.prettier-vscode"},
+  "files.exclude": { "**/__pycache__": true, "**/.pytest_cache": true }
 }

@@ -8,9 +8,20 @@ from app.domain.verify import verify
 from app.samples import sample_invoice
 
 
-@pytest.mark.parametrize("field", ["vendor_name", "invoice_number", "invoice_date", "currency",
-                                  "subtotal", "tax_amount", "shipping_amount", "discount_amount",
-                                  "total_amount"])
+@pytest.mark.parametrize(
+    "field",
+    [
+        "vendor_name",
+        "invoice_number",
+        "invoice_date",
+        "currency",
+        "subtotal",
+        "tax_amount",
+        "shipping_amount",
+        "discount_amount",
+        "total_amount",
+    ],
+)
 def test_missing_fields_block_automatic_approval(field):
     invoice = sample_invoice("clean")
     getattr(invoice, field).value = None
