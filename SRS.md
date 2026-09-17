@@ -312,3 +312,13 @@ These decisions are not blockers for the local sales demo, but must be explicitl
 - Queue/runtime choice and deployment region.
 - The live model/provider, approved data-processing terms, and price catalog version.
 - The client’s system of record and idempotent write-back contract.
+
+## 14. Local inference extension
+
+Ollama is an optional real-inference provider, distinct from deterministic fixtures.
+It must use loopback transport with cloud features disabled, preserve Gemini as
+an explicit alternative, and never silently fall back to a hosted provider.
+The same Pydantic validation, Decimal checks and review policy apply. Provider
+selection is pinned to each uploaded job and is not relabeled after settings change.
+Local latency is measured separately; no cloud-equivalent performance is promised.
+Zero API fees exclude hardware and electricity costs. Model output remains untrusted.

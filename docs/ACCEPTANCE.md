@@ -3,7 +3,7 @@
 ## Verified locally
 
 - Python 3.12; SQLite migration and separate worker startup.
-- 55 automated tests, passing without live credentials.
+- 66 automated tests, passing without live credentials or a local model service.
 - Ruff lint and formatting checks.
 - TypeScript strict compilation and Vite production build.
 - Three offline routing regression fixtures; not a live extraction benchmark.
@@ -15,6 +15,9 @@
 - Live Gemini extraction on 11 evaluation inputs, including a two-page raster scan,
   four public Microsoft samples, and four image-format/orientation variants.
   See [measured results and limitations](LIVE_EVALUATION.md).
+- Real local Qwen3-VL 4B Instruct extraction and full HTTP/worker workflows on
+  clean, two-page discrepancy and missing-date invoices. See [local results](LOCAL_INFERENCE.md).
+- Existing Gemini/fixture records retain their provider after switching to local AI.
 
 ## Explicit implementation choices
 

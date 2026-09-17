@@ -54,7 +54,7 @@ def serialize(job):
         "page_count": job.page_count,
         "created_at": timestamp(job.created_at),
         "error": job.error,
-        "mode": "fixture" if job.sample else settings.provider,
+        "mode": job.provider,
         "result": job.result,
         "summary": {
             key: effective[key]["value"]
@@ -93,6 +93,7 @@ def enqueue(data: bytes, filename: str, key: str, sample: str | None = None):
                 media_type=media_type,
                 page_count=pages,
                 sample=sample,
+                provider="fixture" if sample else settings.provider,
             )
             db.add(job)
             db.flush()

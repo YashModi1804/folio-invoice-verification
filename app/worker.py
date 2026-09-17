@@ -12,6 +12,7 @@ from app.domain.routing import route
 from app.domain.verify import verify
 from app.gemini import PROMPT_VERSION, GeminiProvider
 from app.logging import configure_logging
+from app.ollama import OllamaProvider
 from app.providers import FixtureProvider, ProviderError
 from app.storage import DocumentError, document_path, render
 
@@ -57,7 +58,9 @@ def run_once() -> bool:
             pages = render(document_path(job_id).read_bytes(), job.media_type)
             provider = (
                 FixtureProvider()
-                if job.sample or settings.provider == "fixture"
+                if job.sample or job.provider == "fixture"
+                else OllamaProvider()
+                if job.provider == "ollama"
                 else GeminiProvider()
             )
             extraction = provider.extract(pages, job.sample)
@@ -79,7 +82,9 @@ def run_once() -> bool:
                     "provider": extraction.provider,
                     "model": extraction.model,
                     "schema_version": "1",
-                    "prompt_version": PROMPT_VERSION,
+                    "prompt_version": f"{PROMPT_VERSION}-ollama-v1"
+                    if extraction.provider == "ollama"
+                    else PROMPT_VERSION,
                     "latency_ms": round((time.monotonic() - start) * 1000),
                 },
             }

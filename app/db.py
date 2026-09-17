@@ -35,6 +35,7 @@ class Job(Base):
     page_count: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(40), default="QUEUED", index=True)
     sample: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    provider: Mapped[str] = mapped_column(String(20), default="fixture", server_default="fixture")
     error: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

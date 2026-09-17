@@ -1,5 +1,9 @@
 # Live demonstration document pack
 
+For quota-free real inference, the tested local option is now available. See
+[local setup and measured results](LOCAL_INFERENCE.md). Use **Choose a document**
+in the **LOCAL AI WORKSPACE**; do not confuse it with the offline fixture buttons.
+
 These are evaluation documents, not customer records. Synthetic source documents
 go through the real model when uploaded with `PROVIDER=gemini`. The console's
 three built-in sample buttons remain explicitly labeled **offline fixtures**.

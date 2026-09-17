@@ -178,7 +178,7 @@ export default function App() {
           <div className="operator">
             <span className="mode-pill">
               <span className="dot" />
-              {provider === "fixture" ? "SAMPLE WORKSPACE" : "LIVE WORKSPACE"}
+              {provider === "fixture" ? "SAMPLE WORKSPACE" : provider === "ollama" ? "LOCAL AI WORKSPACE" : "LIVE WORKSPACE"}
             </span>
             <span className="avatar">OP</span>
             <button
@@ -412,7 +412,7 @@ export default function App() {
               <CircleHelp size={12} />
               {provider === "fixture"
                 ? "Samples are synthetic. No API charges."
-                : "Live mode · provider usage applies."}
+                : provider === "ollama" ? "Local inference · No API fees · Uses your hardware." : "Live mode · provider usage applies."}
             </span>
           </footer>
         </div>

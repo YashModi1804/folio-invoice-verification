@@ -11,7 +11,9 @@ class Settings(BaseSettings):
     storage_dir: Path = Path("data/documents")
     operator_token: SecretStr = SecretStr("local-demo-only")
     operator_name: str = "Demo operator"
-    provider: Literal["fixture", "gemini"] = "fixture"
+    provider: Literal["fixture", "gemini", "ollama"] = "fixture"
+    ollama_model: str = "qwen3-vl:4b-instruct"
+    ollama_timeout_seconds: int = 240
     gemini_api_key: SecretStr = SecretStr("")
     gemini_model: str = ""
     max_file_bytes: int = 20 * 1024 * 1024

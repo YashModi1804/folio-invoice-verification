@@ -173,11 +173,11 @@ export default function Document({
           <h1>{job.summary?.vendor_name ?? "Reading your document"}</h1>
           <p>
             {job.filename} · {job.page_count} pages ·{" "}
-            {job.mode === "fixture" ? "Synthetic sample" : "Live extraction"}
+            {job.mode === "fixture" ? "Synthetic sample" : job.mode === "ollama" ? "Local AI extraction" : "Live extraction"}
           </p>
         </div>
         <span className="mode-pill">
-          {job.mode === "fixture" ? "FIXTURE MODE" : "LIVE MODE"}
+          {job.mode === "fixture" ? "FIXTURE MODE" : job.mode === "ollama" ? "LOCAL AI" : "LIVE MODE"}
         </span>
       </div>
       <div

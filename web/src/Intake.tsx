@@ -108,7 +108,9 @@ export default function Intake({
         >
           {provider === "fixture"
             ? "Sample mode is active. Custom documents need a configured live provider."
-            : "Live provider active. Documents are sent to the configured model."}
+            : provider === "ollama"
+              ? "Local AI active. Documents stay on this machine; no cloud API call."
+              : "Live provider active. Documents are sent to the configured model."}
         </p>
       </section>
       <section className="panel">

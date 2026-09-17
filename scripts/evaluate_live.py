@@ -10,16 +10,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.domain.routing import route  # noqa: E402
 from app.domain.verify import verify  # noqa: E402
 from app.gemini import GeminiProvider  # noqa: E402
+from app.ollama import OllamaProvider  # noqa: E402
 from app.providers import ProviderError  # noqa: E402
 from app.storage import inspect, render  # noqa: E402
 
 
-def evaluate(path: Path) -> dict:
+def evaluate(path: Path, provider: str = "gemini") -> dict:
     start = time.monotonic()
     data = path.read_bytes()
     media, pages = inspect(data, path.name)
     try:
-        extraction = GeminiProvider().extract(render(data, media))
+        adapter = OllamaProvider() if provider == "ollama" else GeminiProvider()
+        extraction = adapter.extract(render(data, media))
         checks = verify(extraction.invoice)
         status, reasons = route(extraction.invoice, checks, page_count=pages)
         return {
@@ -45,11 +47,12 @@ def evaluate(path: Path) -> dict:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("files", nargs="+", type=Path)
+    parser.add_argument("--provider", choices=["gemini", "ollama"], default="gemini")
     parser.add_argument("--output", type=Path, default=Path("data/evaluations/live-results.json"))
     args = parser.parse_args()
     results = []
     for path in args.files:
-        result = evaluate(path)
+        result = evaluate(path, args.provider)
         results.append(result)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(results, indent=2) + "\n")
@@ -64,6 +67,8 @@ def main():
             "PROVIDER_UNAVAILABLE",
             "PROVIDER_REQUEST_REJECTED",
             "PROVIDER_RATE_LIMITED",
+            "LOCAL_MODEL_NOT_INSTALLED",
+            "LOCAL_MODEL_UNAVAILABLE",
         }:
             break
     raise SystemExit(1 if any(r["status"] == "FAILED" for r in results) else 0)

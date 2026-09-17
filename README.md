@@ -50,6 +50,9 @@ canned extraction data: in fixture mode they fail with `LIVE_PROVIDER_NOT_CONFIG
 
 ## Live extraction with your free-tier provider
 
+For real inference without an API quota, see [local Ollama setup](docs/LOCAL_INFERENCE.md).
+Local mode keeps extraction on this machine and is clearly separate from offline fixtures.
+
 The Gemini adapter is opt-in. Set these values in your untracked `.env` and restart:
 
 ```dotenv

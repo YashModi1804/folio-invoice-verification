@@ -51,3 +51,10 @@ Use the saved local key without printing it; validate the provider adapter again
 current API behavior; generate three labeled source PDFs and four image variants;
 fetch four public Microsoft examples with provenance; record actual outcomes and
 quota limitations; keep binaries, reports, credentials and databases untracked.
+
+## Follow-up — local inference
+
+Add an explicit Ollama provider, loopback-only transport and local-inference UI
+labels. Preserve Gemini, immutable provenance, Decimal checks and review policy.
+Test the adapter offline, then run the three acceptance documents through the
+actual worker and record measured performance. Keep runtime/model files ignored.
