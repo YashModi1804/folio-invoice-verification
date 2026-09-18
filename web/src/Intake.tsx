@@ -15,11 +15,15 @@ export default function Intake({
   onCreated,
   onError,
   provider,
+  fallback,
+  maxPages,
 }: {
   token: string;
   onCreated: (job: Job) => void;
   onError: (message: string) => void;
   provider: string;
+  fallback: boolean;
+  maxPages: number;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -86,7 +90,7 @@ export default function Intake({
             <Upload size={20} />
           </div>
           <h3>Drop an invoice here</h3>
-          <p>PDF, PNG, JPG or WEBP · Up to 20 MB / 20 pages</p>
+          <p>PDF, PNG, JPG or WEBP · Up to 20 MB / {maxPages} pages</p>
           <button disabled={busy} onClick={() => input.current?.click()}>
             <Upload size={14} />
             {busy ? "Adding document…" : "Choose a document"}
@@ -110,7 +114,9 @@ export default function Intake({
             ? "Sample mode is active. Custom documents need a configured live provider."
             : provider === "ollama"
               ? "Local AI active. Documents stay on this machine; no cloud API call."
-              : "Live provider active. Documents are sent to the configured model."}
+              : fallback
+                ? `${provider === "groq" ? "Groq" : "Gemini"} processes uploads. If unavailable, local AI is attempted once and clearly labeled.`
+                : "Live provider active. Documents are sent to the configured model."}
         </p>
       </section>
       <section className="panel">

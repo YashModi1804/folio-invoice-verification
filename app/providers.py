@@ -8,6 +8,10 @@ from app.samples import sample_invoice
 class ProviderError(RuntimeError):
     """Safe code only: never propagate upstream response bodies to users."""
 
+    def __init__(self, code: str, *, details: dict | None = None):
+        super().__init__(code)
+        self.details = details or {}
+
 
 @dataclass
 class Extraction:

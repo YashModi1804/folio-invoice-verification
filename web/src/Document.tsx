@@ -97,6 +97,36 @@ export default function Document({
   const [decision, setDecision] = useState<Decision>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Invoice | null>(null);
+  const pending = ["QUEUED", "PROCESSING"].includes(job.status);
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!pending) return;
+    const update = () =>
+      setElapsed(
+        Math.max(
+          0,
+          Math.floor((Date.now() - Date.parse(job.created_at)) / 1000),
+        ),
+      );
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [job.created_at, pending]);
+  useEffect(() => {
+    if (!pending) return;
+    let active = true;
+    const timer = setInterval(() => {
+      request<Audit[]>(`/jobs/${job.job_id}/audit`, token)
+        .then((events) => {
+          if (active) setAudit(events);
+        })
+        .catch(() => {}); // Main job polling reports connection failures.
+    }, 2000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [job.job_id, pending, token]);
   useEffect(() => {
     let active = true;
     let url = "";
@@ -135,8 +165,12 @@ export default function Document({
       active = false;
     };
   }, [job.job_id, job.status, token]);
-  const pending = ["QUEUED", "PROCESSING"].includes(job.status);
+  const recovering =
+    pending && audit.some((event) => event.event === "LOCAL_FALLBACK_STARTED");
   const review = job.status === "REQUIRES_HUMAN_REVIEW";
+  const failedTotal = job.result?.checks.find(
+    (check) => check.code === "TOTAL" && check.state === "FAIL",
+  );
   const failed = ["FAILED", "REJECTED"].includes(job.status);
   const invoice = editing ? draft : (decision?.invoice ?? job.result?.invoice);
   function showEvidence(field: Field) {
@@ -173,13 +207,29 @@ export default function Document({
           <h1>{job.summary?.vendor_name ?? "Reading your document"}</h1>
           <p>
             {job.filename} · {job.page_count} pages ·{" "}
-            {job.mode === "fixture" ? "Synthetic sample" : job.mode === "ollama" ? "Local AI extraction" : "Live extraction"}
+            {job.mode === "fixture"
+              ? "Synthetic sample"
+              : job.mode === "ollama"
+                ? "Local AI extraction"
+                : `${job.mode === "groq" ? "Groq" : "Gemini"} live extraction`}
           </p>
         </div>
         <span className="mode-pill">
-          {job.mode === "fixture" ? "FIXTURE MODE" : job.mode === "ollama" ? "LOCAL AI" : "LIVE MODE"}
+          {job.mode === "fixture"
+            ? "FIXTURE MODE"
+            : job.mode === "ollama"
+              ? "LOCAL AI"
+              : `${job.mode.toUpperCase()} LIVE`}
         </span>
       </div>
+      {job.result?.telemetry.fallback_reason && (
+        <p className="evidence" role="status">
+          Completed with local AI after{" "}
+          {job.requested_provider === "groq" ? "Groq" : "Gemini"} was
+          unavailable. The original cloud failure is recorded in the audit
+          trail; verification rules are unchanged.
+        </p>
+      )}
       <div
         className={`decision-banner ${review ? "review" : failed ? "failed" : ""}`}
         role="status"
@@ -195,12 +245,14 @@ export default function Document({
           <h3>{labels[job.status]}</h3>
           <p>
             {pending
-              ? "Your document is queued for extraction and independent verification."
+              ? recovering
+                ? `Cloud service unavailable. Local AI is processing this document · ${elapsed}s elapsed.`
+                : `Extracting and independently verifying your document · ${elapsed}s elapsed.`
               : review
                 ? "This record is held for review. Resolve the flagged details before approval."
                 : failed
                   ? job.error === "PROVIDER_RATE_LIMITED"
-                    ? "Gemini's request quota is exhausted. Check the provider quota and retry the upload after it resets. No financial record was approved."
+                    ? "The provider's request quota is exhausted. Retry after it resets. No financial record was approved."
                     : humanize(job.error ?? "Record rejected by reviewer")
                   : "The record is approved. Its original extraction and verification history are preserved."}
           </p>
@@ -217,7 +269,13 @@ export default function Document({
           {review && (
             <ul className="reason-list">
               {job.result?.route_reasons.map((reason) => (
-                <li key={reason}>• {humanize(reason)}</li>
+                <li key={reason}>
+                  {reason === "TOTAL_FAIL" && failedTotal
+                    ? `Printed total ${failedTotal.observed}; calculated total ${failedTotal.expected}. Difference: ${job.result?.invoice.currency.value ?? ""} ${failedTotal.variance}.`
+                    : reason.startsWith("MISSING_")
+                      ? `Required field not found: ${humanize(reason.slice(8))}.`
+                      : humanize(reason)}
+                </li>
               ))}
             </ul>
           )}
@@ -352,7 +410,9 @@ export default function Document({
                             title="Model confidence, not calibrated probability"
                             aria-label={`View ${humanize(name)} source evidence`}
                           >
-                            {Math.round(invoice[name].confidence * 100)}%
+                            {decision || invoice[name].value === null
+                              ? "Source"
+                              : `${Math.round(invoice[name].confidence * 100)}%`}
                           </button>
                         </>
                       )}

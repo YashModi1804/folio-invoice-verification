@@ -11,6 +11,8 @@ from app.domain.models import Invoice
 from app.gemini import PROMPT, output_schema
 from app.providers import Extraction, ProviderError
 
+LOCAL_PROMPT_VERSION = "invoice-v1-ollama-v2"
+
 
 class OllamaProvider:
     def extract(self, pages: list[bytes], sample: str | None = None) -> Extraction:
@@ -31,8 +33,11 @@ class OllamaProvider:
                         "Extract this invoice from the ordered page images. "
                         "Use confidence numbers between 0 and 1, never percentages. "
                         "Dates are YYYY-MM-DD or null. Absent fields have value null, "
-                        "confidence 0 and evidence []. Return only JSON matching this schema: "
-                        + json.dumps(schema)
+                        "confidence 0 and evidence []. "
+                        "tax_inclusive means tax is already included in the printed subtotal "
+                        "or unit prices, NOT simply that a tax amount is present. "
+                        "When tax is listed as a separate addition to subtotal, use false. "
+                        "Return only JSON matching this schema: " + json.dumps(schema)
                     ),
                     "images": [base64.b64encode(page).decode() for page in pages],
                 },
@@ -66,6 +71,9 @@ class OllamaProvider:
             {
                 "input_tokens": payload.get("prompt_eval_count"),
                 "output_tokens": payload.get("eval_count"),
+                "prompt_version": LOCAL_PROMPT_VERSION,
+                "model_load_ms": round(payload.get("load_duration", 0) / 1_000_000),
+                "generation_ms": round(payload.get("eval_duration", 0) / 1_000_000),
                 "estimated_cost_usd": "0",
                 "pricing_version": "local-no-api-fee-v1",
                 "cost_note": "No API fee. Hardware and electricity costs are excluded.",

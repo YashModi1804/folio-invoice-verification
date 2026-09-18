@@ -58,3 +58,14 @@ Add an explicit Ollama provider, loopback-only transport and local-inference UI
 labels. Preserve Gemini, immutable provenance, Decimal checks and review policy.
 Test the adapter offline, then run the three acceptance documents through the
 actual worker and record measured performance. Keep runtime/model files ignored.
+
+## Follow-up — rehearsal reliability
+
+Use one Gemini request per job, phase-specific timeouts, and an opt-in local
+fallback only for availability failures. Record the cloud failure and actual
+provider without changing verification policy. Benchmark a smaller local model,
+rehearse the real API/review workflow, and preserve measured demo results.
+
+Add Groq vision as an explicit alternative at the user's request. Enforce its
+model-specific page/payload limits before inference; validate JSON locally, retain
+actual provider provenance, and apply the same consent-based local fallback.

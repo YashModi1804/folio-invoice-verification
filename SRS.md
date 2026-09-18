@@ -90,7 +90,7 @@ Validation + routing policy ──► PostgreSQL
 - Extraction output is untrusted until schema, evidence, and deterministic checks complete.
 - API keys and document URLs never appear in logs, browser payloads, or telemetry.
 - Original documents are private and expire according to a configurable retention policy.
-- Each provider request has bounded timeout, retry with exponential backoff for transient errors, idempotency protection, and a recorded provider/model/version.
+- Each provider request has a bounded timeout, idempotency protection, and a recorded provider/model/version. Gemini is attempted once per job; no automatic cloud replay after errors that may already consume quota.
 - Every public response includes a `correlation_id`; logs and audit events use the same ID.
 
 ## 5. Functional Requirements
@@ -322,3 +322,20 @@ The same Pydantic validation, Decimal checks and review policy apply. Provider
 selection is pinned to each uploaded job and is not relabeled after settings change.
 Local latency is measured separately; no cloud-equivalent performance is promised.
 Zero API fees exclude hardware and electricity costs. Model output remains untrusted.
+
+An opt-in Gemini-to-local fallback is permitted for transport, quota, and service
+availability failures only. Consent is captured on the upload audit event; existing
+jobs do not acquire fallback consent when configuration changes. The cloud failure
+is audited before local inference. The result displays its actual provider, and
+cloud usage/cost remains unknown when no response was received. No fallback is
+allowed to conceal schema errors or failed verification. Local-to-cloud fallback
+is never automatic.
+
+## 15. Groq vision extension
+
+Groq is an explicitly selected cloud provider, not a silent fallback between cloud
+accounts. Its JSON-mode output must pass the identical Pydantic and financial
+checks. Enforce documented model limits before requests: Qwen 3.8 27B permits
+three page images, Qwen 3.6 27B five, with a 20 MB serialized request limit.
+The UI must expose the active page limit. Groq may use the same consented local
+recovery path as Gemini, with the actual failed provider named in audit history.

@@ -31,6 +31,7 @@ export type Check = {
   variance: string | null;
 };
 export type Telemetry = {
+  fallback_reason?: string;
   provider: string;
   model: string;
   latency_ms: number;
@@ -54,6 +55,7 @@ export type Job = {
   status: string;
   page_count: number;
   mode: string;
+  requested_provider: string;
   created_at: string;
   error: string | null;
   result: {

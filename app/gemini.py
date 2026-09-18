@@ -1,5 +1,4 @@
 import base64
-import time
 
 import httpx
 from pydantic import ValidationError
@@ -90,23 +89,28 @@ class GeminiProvider:
                 "maxOutputTokens": 16384,
             },
         }
-        with httpx.Client(timeout=settings.provider_timeout_seconds) as client:
-            for attempt in range(3):
-                try:
-                    response = client.post(url, headers={"x-goog-api-key": key}, json=body)
-                except httpx.TransportError as exc:
-                    # A timed-out request may already be billable. Do not replay blindly.
-                    raise ProviderError("PROVIDER_TRANSPORT_FAILURE") from exc
-                if response.status_code not in {429, 500, 502, 503, 504}:
-                    break
-                if attempt == 2:
-                    code = (
-                        "PROVIDER_RATE_LIMITED"
-                        if response.status_code == 429
-                        else "PROVIDER_UNAVAILABLE"
-                    )
-                    raise ProviderError(code)
-                time.sleep(2**attempt)
+        if settings.gemini_thinking_level:
+            body["generationConfig"]["thinkingConfig"] = {
+                "thinkingLevel": settings.gemini_thinking_level
+            }
+        timeout = httpx.Timeout(settings.provider_timeout_seconds, connect=10, write=20, pool=10)
+        with httpx.Client(timeout=timeout) as client:
+            try:
+                response = client.post(url, headers={"x-goog-api-key": key}, json=body)
+            except httpx.TransportError as exc:
+                # One cloud request per job. A lost response may still consume quota.
+                phase = {
+                    httpx.ConnectTimeout: "CONNECT_TIMEOUT",
+                    httpx.ReadTimeout: "READ_TIMEOUT",
+                    httpx.WriteTimeout: "WRITE_TIMEOUT",
+                    httpx.PoolTimeout: "POOL_TIMEOUT",
+                }
+                code = phase.get(type(exc), "TRANSPORT_FAILURE")
+                raise ProviderError(f"PROVIDER_{code}") from exc
+        if response.status_code == 429:
+            raise ProviderError("PROVIDER_RATE_LIMITED")
+        if response.status_code in {500, 502, 503, 504}:
+            raise ProviderError("PROVIDER_UNAVAILABLE")
         if response.status_code != 200:
             raise ProviderError("PROVIDER_REQUEST_REJECTED")
         try:
@@ -129,6 +133,10 @@ class GeminiProvider:
                 "input_tokens": usage.get("promptTokenCount"),
                 "output_tokens": usage.get("candidatesTokenCount"),
                 "reasoning_tokens": usage.get("thoughtsTokenCount"),
+                "provider_request_id": payload.get("responseId"),
+                "model_version": payload.get("modelVersion"),
+                "cloud_requests": 1,
+                "thinking_level": settings.gemini_thinking_level or "provider default",
                 "estimated_cost_usd": None,
                 "pricing_version": None,
                 "cost_note": "Billing tier not verified; consult provider usage.",

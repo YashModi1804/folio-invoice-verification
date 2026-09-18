@@ -1,5 +1,9 @@
 # Live demonstration document pack
 
+Current provider setup and recording instructions: [live rehearsal guide](REHEARSAL.md).
+Groq is now available as an explicit live provider; its selected model permits
+three page images. Fixture buttons still perform no inference.
+
 For quota-free real inference, the tested local option is now available. See
 [local setup and measured results](LOCAL_INFERENCE.md). Use **Choose a document**
 in the **LOCAL AI WORKSPACE**; do not confuse it with the offline fixture buttons.

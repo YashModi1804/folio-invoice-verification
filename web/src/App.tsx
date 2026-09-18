@@ -30,16 +30,24 @@ export default function App() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [provider, setProvider] = useState("fixture");
+  const [fallback, setFallback] = useState(false);
+  const [maxPages, setMaxPages] = useState(20);
   const [ready, setReady] = useState(false);
   const load = useCallback(async () => {
     if (!token) return;
     try {
       const [items, config] = await Promise.all([
         request<Job[]>("/jobs", token),
-        request<{ provider: string }>("/config", token),
+        request<{
+          provider: string;
+          local_fallback_enabled: boolean;
+          max_pages: number;
+        }>("/config", token),
       ]);
       setJobs(items);
       setProvider(config.provider);
+      setFallback(config.local_fallback_enabled);
+      setMaxPages(config.max_pages);
       setReady(true);
     } catch (error) {
       setError((error as Error).message);
@@ -178,7 +186,11 @@ export default function App() {
           <div className="operator">
             <span className="mode-pill">
               <span className="dot" />
-              {provider === "fixture" ? "SAMPLE WORKSPACE" : provider === "ollama" ? "LOCAL AI WORKSPACE" : "LIVE WORKSPACE"}
+              {provider === "fixture"
+                ? "SAMPLE WORKSPACE"
+                : provider === "ollama"
+                  ? "LOCAL AI WORKSPACE"
+                  : "LIVE WORKSPACE"}
             </span>
             <span className="avatar">OP</span>
             <button
@@ -290,6 +302,8 @@ export default function App() {
                   <Intake
                     token={token}
                     provider={provider}
+                    fallback={fallback}
+                    maxPages={maxPages}
                     onError={setError}
                     onCreated={(job) => {
                       setJobs((items) => [job, ...items]);
@@ -412,7 +426,9 @@ export default function App() {
               <CircleHelp size={12} />
               {provider === "fixture"
                 ? "Samples are synthetic. No API charges."
-                : provider === "ollama" ? "Local inference · No API fees · Uses your hardware." : "Live mode · provider usage applies."}
+                : provider === "ollama"
+                  ? "Local inference · No API fees · Uses your hardware."
+                  : "Live mode · provider usage applies."}
             </span>
           </footer>
         </div>

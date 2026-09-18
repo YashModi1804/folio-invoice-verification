@@ -12,7 +12,7 @@ from app.samples import sample_invoice
 def live_settings(monkeypatch):
     monkeypatch.setattr(settings, "gemini_api_key", SecretStr("test-key"))
     monkeypatch.setattr(settings, "gemini_model", "test-vision-model")
-    monkeypatch.setattr("app.gemini.time.sleep", lambda _: None)
+    monkeypatch.setattr(settings, "gemini_thinking_level", "minimal")
 
 
 def reply(text, finish="STOP"):
@@ -29,6 +29,9 @@ def test_schema_and_usage_are_preserved(monkeypatch, live_settings):
         assert output["mimeType"] == "APPLICATION_JSON"
         assert output["schema"]["type"] == "object"
         assert "systemInstruction" in kwargs["json"]
+        assert kwargs["json"]["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "minimal"}
+        assert self.timeout.connect == 10
+        assert self.timeout.read == settings.provider_timeout_seconds
         return httpx.Response(200, json=reply(sample_invoice("clean").model_dump_json()))
 
     monkeypatch.setattr(httpx.Client, "post", post)
@@ -53,7 +56,7 @@ def test_bad_model_outputs_are_safe(monkeypatch, live_settings, payload, code):
         GeminiProvider().extract([b"image"])
 
 
-def test_rate_limit_retries_are_bounded(monkeypatch, live_settings):
+def test_rate_limit_does_not_spend_quota_retrying(monkeypatch, live_settings):
     calls = []
 
     def post(*args, **kwargs):
@@ -63,7 +66,7 @@ def test_rate_limit_retries_are_bounded(monkeypatch, live_settings):
     monkeypatch.setattr(httpx.Client, "post", post)
     with pytest.raises(ProviderError, match="PROVIDER_RATE_LIMITED"):
         GeminiProvider().extract([b"image"])
-    assert len(calls) == 3
+    assert len(calls) == 1
 
 
 def test_transport_timeout_is_not_blindly_replayed(monkeypatch, live_settings):
@@ -74,7 +77,7 @@ def test_transport_timeout_is_not_blindly_replayed(monkeypatch, live_settings):
         raise httpx.ReadTimeout("sensitive upstream text")
 
     monkeypatch.setattr(httpx.Client, "post", post)
-    with pytest.raises(ProviderError, match="PROVIDER_TRANSPORT_FAILURE"):
+    with pytest.raises(ProviderError, match="PROVIDER_READ_TIMEOUT"):
         GeminiProvider().extract([b"image"])
     assert len(calls) == 1
 

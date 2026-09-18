@@ -37,10 +37,22 @@
   representative dataset. Evidence is page/text-based; bounding-box highlighting is deferred.
 - Source retention is an explicit dry-run/apply command; it is not scheduled locally.
 
+## September 18 rehearsal update
+
+93 automated tests passed, including Groq contracts, pre-request limits, bounded
+cloud attempts, fallback consent/provenance, quota diagnostics and review preservation.
+Ruff checks and the TypeScript/production build passed. Browser file chooser upload,
+review editing and the saved audit trail were exercised with real local inference
+after a Groq rate limit. The two-page Groq API/worker challenge also passed live.
+See [rehearsal results and constraints](REHEARSAL.md).
+
+Final paced run: all three synthetic invoices passed through Groq itself in
+3.545 / 3.197 / 2.969 seconds, with no local fallback. Exact financial ground truth
+was checked, not only route labels. A fourth, public layout preserved absent
+charges as null and correctly distinguished invoice total from balance due.
+
 ## Not yet verified
 
-- Successful live browser/API-to-worker extraction after the evaluation batch;
-  the account's free-tier request quota blocked subsequent uploads (HTTP 429).
 - Extraction accuracy, confidence calibration, or live p95 latency on client documents.
 - Docker/PostgreSQL deployment; Docker is not installed in this environment.
 - Production concurrency, load, backup/restore, public-hosting hardening, or compliance.

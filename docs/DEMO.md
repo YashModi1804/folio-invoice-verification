@@ -1,5 +1,8 @@
 # 60-second agency demo
 
+For the current real-inference recording, use [the live rehearsal guide](REHEARSAL.md).
+The script below is the original offline-fixture alternative, not a live model demo.
+
 Prepare the local console, one clean sample, and a fresh discrepancy sample. Keep
 the browser at normal desktop width. Clearly introduce fixture mode before recording.
 

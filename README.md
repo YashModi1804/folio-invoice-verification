@@ -50,6 +50,24 @@ canned extraction data: in fixture mode they fail with `LIVE_PROVIDER_NOT_CONFIG
 
 ## Live extraction with your free-tier provider
 
+The current rehearsal uses **Groq Qwen 3.8 27B**, with explicit local recovery on
+availability errors. See [rehearsal notes](docs/REHEARSAL.md) for measured results,
+recording instructions, and quota limitations. Run `.venv/bin/python scripts/preflight.py`
+before recording; it makes no cloud inference call.
+
+```dotenv
+PROVIDER=groq
+GROQ_API_KEY=your-key
+GROQ_MODEL=qwen/qwen3.8-27b
+LOCAL_FALLBACK_ENABLED=true
+```
+
+Groq uses image inputs and JSON mode, followed by strict local Pydantic validation.
+This model accepts up to **three pages per request**; Folio rejects excess pages
+before inference and shows the limit in the console. JSON mode alone does not
+guarantee the extraction schema. Free-tier quotas still apply; do not submit a rapid
+batch immediately before recording. See [Groq vision documentation](https://console.groq.com/docs/vision).
+
 For real inference without an API quota, see [local Ollama setup](docs/LOCAL_INFERENCE.md).
 Local mode keeps extraction on this machine and is clearly separate from offline fixtures.
 
@@ -65,9 +83,16 @@ Select a model supported by your account's free tier. Availability, quotas, and 
 handling terms depend on the provider; Folio does not provision or enforce a free
 billing tier. The adapter uses Google's
 [generateContent API](https://ai.google.dev/api/generate-content) with image inputs,
-a JSON schema, bounded retries, and local Pydantic validation. Its contract is tested
+a JSON schema, one cloud attempt per job, and local Pydantic validation. Its contract is tested
 using mocked responses. Gemini `gemini-3.6-flash` was also checked with 11 local
 evaluation inputs on 2026-09-16; see [live evaluation](docs/LIVE_EVALUATION.md).
+The saved alternative is now `gemini-3.1-flash-lite` with
+`GEMINI_THINKING_LEVEL=minimal`, tested on the challenge invoice on September 18.
+
+Local fallback is opt-in and requires the Ollama server to be running. Upload audit
+events pin consent. Only availability failures permit fallback; invalid extractions
+or bad arithmetic do not. The UI shows the actual provider, and the failed cloud
+attempt remains auditable. There is no silent cloud-to-cloud substitution.
 
 Unknown live cost is `null`, never a fabricated zero. Fixture cost is explicitly zero
 because there is no API call. Confidence is a model heuristic, not a calibrated
@@ -81,7 +106,7 @@ flowchart LR
     A --> D[(Database jobs)]
     A --> S[Private source files]
     D --> W[Separate worker]
-    W --> P[Fixture or Gemini adapter]
+    W --> P[Fixture, Gemini, Groq or local adapter]
     P --> V[Typed invoice + decimal checks]
     V --> R{Routing policy}
     R -->|Pass| Y[Auto-approved record]

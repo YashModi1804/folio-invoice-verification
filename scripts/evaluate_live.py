@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.domain.routing import route  # noqa: E402
 from app.domain.verify import verify  # noqa: E402
 from app.gemini import GeminiProvider  # noqa: E402
+from app.groq import GroqProvider  # noqa: E402
 from app.ollama import OllamaProvider  # noqa: E402
 from app.providers import ProviderError  # noqa: E402
 from app.storage import inspect, render  # noqa: E402
@@ -20,7 +21,9 @@ def evaluate(path: Path, provider: str = "gemini") -> dict:
     data = path.read_bytes()
     media, pages = inspect(data, path.name)
     try:
-        adapter = OllamaProvider() if provider == "ollama" else GeminiProvider()
+        adapter = {"ollama": OllamaProvider, "gemini": GeminiProvider, "groq": GroqProvider}[
+            provider
+        ]()
         extraction = adapter.extract(render(data, media))
         checks = verify(extraction.invoice)
         status, reasons = route(extraction.invoice, checks, page_count=pages)
@@ -40,6 +43,7 @@ def evaluate(path: Path, provider: str = "gemini") -> dict:
             "file": str(path),
             "status": "FAILED",
             "error": str(exc),
+            "diagnostics": exc.details,
             "latency_ms": round((time.monotonic() - start) * 1000),
         }
 
@@ -47,7 +51,7 @@ def evaluate(path: Path, provider: str = "gemini") -> dict:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("files", nargs="+", type=Path)
-    parser.add_argument("--provider", choices=["gemini", "ollama"], default="gemini")
+    parser.add_argument("--provider", choices=["gemini", "groq", "ollama"], default="gemini")
     parser.add_argument("--output", type=Path, default=Path("data/evaluations/live-results.json"))
     args = parser.parse_args()
     results = []
