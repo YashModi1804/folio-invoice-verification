@@ -64,13 +64,20 @@ def document_path(job_id: str) -> Path:
     return settings.storage_dir / f"{job_id}.bin"
 
 
-def render(data: bytes, media_type: str) -> list[bytes]:
+def render(
+    data: bytes, media_type: str, page_numbers: tuple[int, ...] | None = None
+) -> list[bytes]:
     if media_type == "application/pdf":
         with pymupdf.open(stream=data, filetype="pdf") as doc:
+            selected = page_numbers or tuple(range(1, len(doc) + 1))
             return [
-                page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), alpha=False).tobytes("png")
-                for page in doc
+                doc[page_number - 1]
+                .get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), alpha=False)
+                .tobytes("png")
+                for page_number in selected
             ]
+    if page_numbers and page_numbers != (1,):
+        raise DocumentError("PAGE_NOT_FOUND")
     with Image.open(BytesIO(data)) as image:
         image.thumbnail((2400, 2400))
         output = BytesIO()

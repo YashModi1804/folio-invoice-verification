@@ -9,7 +9,7 @@ from app.db import Job, now
 from app.domain.routing import route
 from app.domain.verify import verify
 from app.samples import sample_invoice, sample_pdf
-from app.storage import DocumentError, document_path, inspect
+from app.storage import DocumentError, document_path, inspect, render
 
 
 def test_encrypted_pdf_is_rejected():
@@ -26,6 +26,16 @@ def test_page_limit():
         data = doc.tobytes()
     with pytest.raises(DocumentError, match="PAGE_LIMIT"):
         inspect(data, "long.pdf")
+
+
+def test_render_can_select_only_planned_pdf_pages():
+    with pymupdf.open() as doc:
+        for index in range(3):
+            page = doc.new_page()
+            page.insert_text((72, 72), f"Page {index + 1}")
+        data = doc.tobytes()
+    selected = render(data, "application/pdf", page_numbers=(1, 3))
+    assert len(selected) == 2
 
 
 def test_content_type_must_match_extension():

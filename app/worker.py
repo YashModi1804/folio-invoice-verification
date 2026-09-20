@@ -189,15 +189,23 @@ def run_once() -> bool:
         with Session() as db:
             job = db.get(Job, job_id)
             document = document_path(job_id).read_bytes()
-            pages = render(document, job.media_type)
             plan = None
+            page_plan_details = None
+            planning_start = time.monotonic()
             if job.provider == "groq":
                 plan = groq_page_plan(document, job.media_type)
                 if reserve_groq_capacity(job_id, plan.estimated_tokens) is not None:
                     logger.info("job_deferred_for_provider_capacity", extra={"job_id": job_id})
                     return True
                 page_plan_details = record_page_plan(job_id, plan)
-                pages = [pages[page_number - 1] for page_number in plan.selected_pages]
+            planning_ms = round((time.monotonic() - planning_start) * 1000)
+            rendering_start = time.monotonic()
+            pages = render(
+                document,
+                job.media_type,
+                page_numbers=plan.selected_pages if plan else None,
+            )
+            rendering_ms = round((time.monotonic() - rendering_start) * 1000)
             provider = (
                 FixtureProvider()
                 if job.sample or job.provider == "fixture"
@@ -239,6 +247,8 @@ def run_once() -> bool:
                     if extraction.provider == "groq"
                     else PROMPT_VERSION,
                     "latency_ms": round((time.monotonic() - start) * 1000),
+                    "planning_ms": planning_ms,
+                    "rendering_ms": rendering_ms,
                     **(
                         {
                             "page_plan": {

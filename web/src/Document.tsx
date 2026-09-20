@@ -142,6 +142,9 @@ export default function Document({
     job.status === "QUEUED" &&
     job.not_before !== null &&
     Date.parse(job.not_before) > Date.now();
+  const capacityWaitSeconds = job.not_before
+    ? Math.max(0, Math.ceil((Date.parse(job.not_before) - Date.now()) / 1000))
+    : 0;
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
     if (!pending) return;
@@ -292,7 +295,7 @@ export default function Document({
               ? recovering
                 ? `Cloud service unavailable. Local AI is processing this document · ${elapsed}s elapsed.`
                 : waitingForCapacity
-                  ? `Waiting for provider capacity. No model request has been made yet.`
+                  ? `Waiting for provider capacity. Next attempt in about ${capacityWaitSeconds}s; no model request has been made yet.`
                 : `Extracting and independently verifying your document · ${elapsed}s elapsed.`
               : review
                 ? "This record is held for review. Resolve the flagged details before approval."
