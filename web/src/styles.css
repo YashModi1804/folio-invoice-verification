@@ -628,6 +628,14 @@ tbody tr:hover {
   font-size: 11px;
   line-height: 1.8;
 }
+.review-trace {
+  margin-top: 12px;
+  font-size: 11px;
+}
+.review-trace summary {
+  cursor: pointer;
+  font-weight: 600;
+}
 .review-form {
   padding: 20px 22px;
 }

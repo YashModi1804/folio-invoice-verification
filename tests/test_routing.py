@@ -30,7 +30,26 @@ def test_missing_fields_block_automatic_approval(field):
 
 def test_evidence_page_bounds():
     invoice = sample_invoice("clean")
-    assert route(invoice, verify(invoice), page_count=1)[0] == "REQUIRES_HUMAN_REVIEW"
+    for field in (
+        invoice.vendor_name,
+        invoice.invoice_number,
+        invoice.invoice_date,
+        invoice.currency,
+        invoice.subtotal,
+        invoice.tax_amount,
+        invoice.shipping_amount,
+        invoice.discount_amount,
+        invoice.total_amount,
+    ):
+        field.evidence = [
+            evidence.model_copy(update={"page_number": 1}) for evidence in field.evidence
+        ]
+    invoice.vendor_name.evidence.append(
+        invoice.vendor_name.evidence[0].model_copy(update={"page_number": 2})
+    )
+    status, reasons = route(invoice, verify(invoice), page_count=1)
+    assert status == "REQUIRES_HUMAN_REVIEW"
+    assert reasons == ["INVALID_EVIDENCE_PAGE_REFERENCE"]
 
 
 @pytest.mark.parametrize("condition", ["tax_inclusive", "ambiguous_document"])

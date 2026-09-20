@@ -18,14 +18,23 @@ def route(
     invoice: Invoice, checks: list[Check], threshold: float = 0.85, page_count: int = 20
 ) -> tuple[str, list[str]]:
     reasons = []
+    has_invalid_evidence_reference = False
     for name in CORE_FIELDS:
         field = getattr(invoice, name)
         if field.value is None or (isinstance(field.value, str) and not field.value.strip()):
             reasons.append(f"MISSING_{name.upper()}")
         if field.confidence < threshold:
             reasons.append(f"LOW_CONFIDENCE_{name.upper()}")
-        if not field.evidence or any(e.page_number > page_count for e in field.evidence):
+        valid_evidence = [
+            evidence for evidence in field.evidence if 1 <= evidence.page_number <= page_count
+        ]
+        if not valid_evidence:
             reasons.append(f"MISSING_EVIDENCE_{name.upper()}")
+        if len(valid_evidence) != len(field.evidence):
+            has_invalid_evidence_reference = True
+    if has_invalid_evidence_reference:
+        # Keep valid citations useful, but never let an impossible citation pass silently.
+        reasons.append("INVALID_EVIDENCE_PAGE_REFERENCE")
     if invoice.currency.value not in SUPPORTED_CURRENCIES:
         reasons.append("UNSUPPORTED_CURRENCY")
     if any(

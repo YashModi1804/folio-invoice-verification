@@ -35,6 +35,46 @@ const fieldNames = [
   "total_amount",
 ] as const;
 
+function describeRouteReason(reason: string, failedTotal?: Check, currency?: string | null) {
+  if (reason === "TOTAL_FAIL" && failedTotal) {
+    return `Printed total ${failedTotal.observed}; calculated total ${failedTotal.expected}. Difference: ${currency ?? ""} ${failedTotal.variance}.`;
+  }
+  if (reason === "INVALID_EVIDENCE_PAGE_REFERENCE") {
+    return "One or more model citations point to a page that is not in this document.";
+  }
+  if (reason.startsWith("MISSING_")) {
+    return `Required field not found: ${humanize(reason.slice(8))}.`;
+  }
+  return humanize(reason);
+}
+
+function reviewSummary(reasons: string[], failedTotal?: Check, currency?: string | null) {
+  const summary: string[] = [];
+  if (reasons.includes("TOTAL_FAIL") && failedTotal) {
+    summary.push(describeRouteReason("TOTAL_FAIL", failedTotal, currency));
+  }
+  if (reasons.some((reason) => reason.endsWith("_NOT_APPLICABLE"))) {
+    summary.push("The document does not provide enough detail to reconcile all printed amounts.");
+  }
+  const unstated = ["TAX_AMOUNT", "SHIPPING_AMOUNT", "DISCOUNT_AMOUNT"].filter((field) =>
+    reasons.includes(`MISSING_${field}`),
+  );
+  if (unstated.length) {
+    summary.push(`Not stated on the document: ${unstated.map(humanize).join(", ")}.`);
+  }
+  const missingCore = reasons
+    .filter((reason) => reason.startsWith("MISSING_"))
+    .map((reason) => reason.slice(8))
+    .filter((field) => !["TAX_AMOUNT", "SHIPPING_AMOUNT", "DISCOUNT_AMOUNT"].includes(field));
+  if (missingCore.length) {
+    summary.push(`Required details need confirmation: ${missingCore.map(humanize).join(", ")}.`);
+  }
+  if (reasons.includes("INVALID_EVIDENCE_PAGE_REFERENCE")) {
+    summary.push("Some source citations cannot be opened and need a quick check.");
+  }
+  return summary.length ? summary : ["This record needs a human decision before approval."];
+}
+
 export function CheckLedger({ checks }: { checks: Check[] }) {
   return (
     <section className="panel section-gap">
@@ -267,17 +307,33 @@ export default function Document({
             </div>
           )}
           {review && (
-            <ul className="reason-list">
-              {job.result?.route_reasons.map((reason) => (
-                <li key={reason}>
-                  {reason === "TOTAL_FAIL" && failedTotal
-                    ? `Printed total ${failedTotal.observed}; calculated total ${failedTotal.expected}. Difference: ${job.result?.invoice.currency.value ?? ""} ${failedTotal.variance}.`
-                    : reason.startsWith("MISSING_")
-                      ? `Required field not found: ${humanize(reason.slice(8))}.`
-                      : humanize(reason)}
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="reason-list">
+                {reviewSummary(
+                  job.result?.route_reasons ?? [],
+                  failedTotal,
+                  job.result?.invoice.currency.value,
+                ).map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+              <details className="review-trace">
+                <summary>
+                  Technical review trace ({job.result?.route_reasons.length ?? 0} checks)
+                </summary>
+                <ul className="reason-list">
+                  {job.result?.route_reasons.map((reason) => (
+                    <li key={reason}>
+                      {describeRouteReason(
+                        reason,
+                        failedTotal,
+                        job.result?.invoice.currency.value,
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </>
           )}
         </div>
       </div>
