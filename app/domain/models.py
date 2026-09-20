@@ -60,3 +60,8 @@ class Decision(Contract):
     action: Literal["approve", "reject"]
     note: str = Field(min_length=3, max_length=1000)
     corrected_invoice: Invoice | None = None
+
+
+class ERPExportAcknowledgement(Contract):
+    system: str = Field(min_length=2, max_length=80)
+    external_record_id: str = Field(min_length=1, max_length=200)

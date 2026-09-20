@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select, text
 from starlette.exceptions import HTTPException
 
-from app import review  # noqa: F401 — registers review routes
+from app import integrations, review  # noqa: F401 — registers integration and review routes
 from app.api import router
 from app.config import settings
 from app.db import Job, Session, WorkerHeartbeat, engine, now

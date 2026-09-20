@@ -51,6 +51,33 @@ def test_review_preserves_original_and_prevents_duplicate_decision(client):
     assert client.get("/api/v1/review-tasks").json() == []
 
 
+def test_erp_export_is_approved_only_and_idempotently_acknowledged(client):
+    review = processed(client, "variance")
+    assert client.get(f"/api/v1/jobs/{review['job_id']}/erp-export").status_code == 409
+    corrected = review["result"]["invoice"]
+    corrected["total_amount"]["value"] = "1250.00"
+    assert (
+        client.post(
+            f"/api/v1/review-tasks/{review['job_id']}/decision",
+            json={
+                "action": "approve",
+                "note": "Confirmed corrected amount for export",
+                "corrected_invoice": corrected,
+            },
+        ).status_code
+        == 200
+    )
+    export = client.get(f"/api/v1/jobs/{review['job_id']}/erp-export").json()
+    assert export["schema_version"] == "folio.erp-export.v1"
+    assert export["invoice"]["amounts"]["total"] == "1250.00"
+    payload = {"system": "Odoo", "external_record_id": "BILL-401"}
+    path = f"/api/v1/jobs/{review['job_id']}/erp-export/acknowledgements"
+    assert client.post(path, json=payload).status_code == 200
+    assert client.post(path, json=payload).status_code == 200
+    audit = client.get(f"/api/v1/jobs/{review['job_id']}/audit").json()
+    assert [item["event"] for item in audit].count("ERP_EXPORT_ACKNOWLEDGED") == 1
+
+
 def test_idempotent_upload_and_conflict(client):
     data = sample_pdf("clean")
 

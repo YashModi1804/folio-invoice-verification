@@ -128,6 +128,9 @@ flowchart LR
   Human approval can explicitly accept remaining discrepancies; the checks stay visible.
 - **Telemetry:** recorded provider usage, processing latency, policy reasons, health
   endpoints, and JSON worker logs without source text.
+- **ERP handoff:** approved records expose a versioned, vendor-neutral JSON export with an
+  idempotency key. A connector maps that payload to NetSuite, Odoo, Dynamics, SAP, or a
+  client API, then acknowledges its external record ID back into Folio's audit trail.
 
 The relational model keeps immutable extraction/check JSON inside each job aggregate;
 review decisions and audit events are separate related tables. This intentionally
@@ -149,6 +152,8 @@ with the operator token. All `/api/v1` routes and source images require authenti
 | POST | `/api/v1/review-tasks/{id}/decision` | Approve/reject with note and optional corrected invoice |
 | GET | `/api/v1/jobs/{id}/audit` | Original and review events |
 | GET | `/api/v1/jobs/{id}/decision` | Corrected snapshot and recalculated checks |
+| GET | `/api/v1/jobs/{id}/erp-export` | Versioned export for approved records only |
+| POST | `/api/v1/jobs/{id}/erp-export/acknowledgements` | Persist a connector's external record ID |
 | GET | `/api/v1/metrics` | Counts, review/failure rates, and processing latency percentiles |
 | GET | `/health/live`, `/health/ready` | API liveness; database/storage/worker readiness |
 
