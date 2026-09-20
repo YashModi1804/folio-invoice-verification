@@ -94,12 +94,21 @@ def test_whitespace_review_note_is_invalid(client):
     )
 
 
-def test_negative_amount_is_reviewed():
+def test_negative_tax_amount_is_reviewed():
     invoice = sample_invoice("clean")
-    invoice.discount_amount.value = -1
+    invoice.tax_amount.value = -1
     status, reasons = route(invoice, verify(invoice))
     assert status == "REQUIRES_HUMAN_REVIEW"
     assert "NEGATIVE_AMOUNT_REQUIRES_REVIEW" in reasons
+
+
+def test_negative_printed_discount_is_a_discount_magnitude():
+    invoice = sample_invoice("clean")
+    invoice.discount_amount.value = -50
+    invoice.total_amount.value = 1200
+    checks = verify(invoice)
+    assert checks[-1].state == "PASS"
+    assert "NEGATIVE_AMOUNT_REQUIRES_REVIEW" not in route(invoice, checks)[1]
 
 
 def test_timestamps_are_explicit_utc(client):

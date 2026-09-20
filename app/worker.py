@@ -208,7 +208,10 @@ def run_once() -> bool:
                 else GeminiProvider()
             )
             extraction = extract_with_fallback(job, pages, provider)
-            checks = verify(extraction.invoice)
+            checks = verify(
+                extraction.invoice,
+                line_items_complete=not plan or not plan.skipped_pages,
+            )
             status, reasons = route(
                 extraction.invoice,
                 checks,

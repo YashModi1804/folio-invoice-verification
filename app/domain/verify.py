@@ -23,9 +23,9 @@ def compare(code: str, expected: Decimal | None, observed: Decimal | None) -> Ch
     )
 
 
-def verify(invoice: Invoice) -> list[Check]:
+def verify(invoice: Invoice, *, line_items_complete: bool = True) -> list[Check]:
     checks = []
-    complete = bool(invoice.line_items)
+    complete = bool(invoice.line_items) and line_items_complete
     subtotal = Decimal("0")
     for index, item in enumerate(invoice.line_items):
         expected = None
@@ -44,6 +44,9 @@ def verify(invoice: Invoice) -> list[Check]:
     ]
     total = None
     if all(value is not None for value in operands) and not invoice.tax_inclusive:
-        total = rounded(operands[0] + operands[1] + operands[2] - operands[3])
+        # Providers often preserve a printed "-120.00" discount. Treat either
+        # representation as the same discount magnitude; the source text remains
+        # attached as evidence for the reviewer.
+        total = rounded(operands[0] + operands[1] + operands[2] - abs(operands[3]))
     checks.append(compare("TOTAL", total, invoice.total_amount.value))
     return checks

@@ -43,7 +43,7 @@ def route(
         reasons.append("UNSUPPORTED_CURRENCY")
     if any(
         getattr(invoice, name).value is not None and getattr(invoice, name).value < 0
-        for name in ("subtotal", "tax_amount", "shipping_amount", "discount_amount", "total_amount")
+        for name in ("subtotal", "tax_amount", "shipping_amount", "total_amount")
     ):
         reasons.append("NEGATIVE_AMOUNT_REQUIRES_REVIEW")
     if any(

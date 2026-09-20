@@ -144,6 +144,7 @@ def test_groq_worker_and_page_limit(client, monkeypatch):
     saved = client.get(f"/api/v1/jobs/{job['job_id']}").json()
     assert saved["status"] == "REQUIRES_HUMAN_REVIEW"
     assert "INCOMPLETE_PAGE_COVERAGE" in saved["result"]["route_reasons"]
+    assert saved["result"]["checks"][-2]["state"] == "NOT_APPLICABLE"
     assert saved["result"]["telemetry"]["page_plan"]["selected_pages"] == [1, 2, 4]
     assert saved["result"]["telemetry"]["page_plan"]["skipped_pages"] == [3]
 
