@@ -40,6 +40,7 @@ class Job(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    not_before: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     review_decision: Mapped["ReviewDecision | None"] = relationship(
         lazy="selectin", viewonly=True, uselist=False

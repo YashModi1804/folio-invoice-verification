@@ -4,18 +4,20 @@ import logging
 import time
 from datetime import timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 
 from app.config import settings
-from app.db import AuditEvent, Job, Session, WorkerHeartbeat, new_id, now
+from app.db import AuditEvent, Job, Session, WorkerHeartbeat, new_id, now, timestamp
+from app.domain.capacity import RESERVATION_EVENT, reserve_or_defer
+from app.domain.page_plan import make_plan
 from app.domain.routing import route
 from app.domain.verify import verify
 from app.gemini import PROMPT_VERSION, GeminiProvider
-from app.groq import GROQ_PROMPT_VERSION, GroqProvider
+from app.groq import GROQ_PROMPT_VERSION, VISION_PAGE_LIMITS, GroqProvider
 from app.logging import configure_logging
 from app.ollama import LOCAL_PROMPT_VERSION, OllamaProvider
 from app.providers import FixtureProvider, ProviderError
-from app.storage import DocumentError, document_path, render
+from app.storage import DocumentError, document_path, page_texts, render
 
 logger = logging.getLogger("folio.worker")
 WORKER_ID = new_id()
@@ -80,6 +82,71 @@ def extract_with_fallback(job, pages, provider):
         return extraction
 
 
+def groq_page_plan(data: bytes, media_type: str):
+    """Keep an individual Groq request inside its free-tier token budget."""
+    base_tokens = settings.groq_request_overhead_tokens + settings.groq_output_reserve_tokens
+    available_for_images = settings.groq_tokens_per_minute - base_tokens
+    model_limit = VISION_PAGE_LIMITS.get(settings.groq_model, 1)
+    max_pages = min(model_limit, max(1, available_for_images // settings.groq_image_tokens))
+    return make_plan(
+        page_texts(data, media_type),
+        max_pages_per_request=max_pages,
+        base_tokens=base_tokens,
+        image_tokens=settings.groq_image_tokens,
+    )
+
+
+def reserve_groq_capacity(job_id: str, estimated_tokens: int):
+    with Session.begin() as db:
+        deferred_until = reserve_or_defer(
+            db,
+            estimated_tokens=estimated_tokens,
+            limit=settings.groq_tokens_per_minute,
+            now=now(),
+        )
+        job = db.get(Job, job_id)
+        if deferred_until is None:
+            db.add(
+                AuditEvent(
+                    job_id=job_id,
+                    event=RESERVATION_EVENT,
+                    actor="worker",
+                    details={"estimated_tokens": estimated_tokens},
+                )
+            )
+            return None
+        job.status = "QUEUED"
+        job.started_at = None
+        job.not_before = deferred_until
+        db.add(
+            AuditEvent(
+                job_id=job_id,
+                event="PROVIDER_CAPACITY_DEFERRED",
+                actor="worker",
+                details={
+                    "retry_at": timestamp(deferred_until),
+                    "estimated_tokens": estimated_tokens,
+                },
+            )
+        )
+        return deferred_until
+
+
+def record_page_plan(job_id: str, plan) -> dict:
+    details = {
+        "strategy": "native-text-v1",
+        "selected_pages": list(plan.selected_pages),
+        "skipped_pages": list(plan.skipped_pages),
+        "roles": list(plan.roles),
+        "estimated_tokens": plan.estimated_tokens,
+    }
+    with Session.begin() as db:
+        db.add(
+            AuditEvent(job_id=job_id, event="PAGE_PLAN_CREATED", actor="worker", details=details)
+        )
+    return details
+
+
 def run_once() -> bool:
     with Session.begin() as db:
         db.merge(WorkerHeartbeat(id=WORKER_ID, last_seen=now()))
@@ -99,14 +166,20 @@ def run_once() -> bool:
                 )
             )
         job_id = db.scalar(
-            select(Job.id).where(Job.status == "QUEUED").order_by(Job.created_at).limit(1)
+            select(Job.id)
+            .where(
+                Job.status == "QUEUED",
+                or_(Job.not_before.is_(None), Job.not_before <= now()),
+            )
+            .order_by(Job.created_at)
+            .limit(1)
         )
         if job_id is None:
             return False
         claimed = db.execute(
             update(Job)
             .where(Job.id == job_id, Job.status == "QUEUED")
-            .values(status="PROCESSING", started_at=now())
+            .values(status="PROCESSING", started_at=now(), not_before=None)
         )
         if claimed.rowcount != 1:
             return True
@@ -115,7 +188,16 @@ def run_once() -> bool:
     try:
         with Session() as db:
             job = db.get(Job, job_id)
-            pages = render(document_path(job_id).read_bytes(), job.media_type)
+            document = document_path(job_id).read_bytes()
+            pages = render(document, job.media_type)
+            plan = None
+            if job.provider == "groq":
+                plan = groq_page_plan(document, job.media_type)
+                if reserve_groq_capacity(job_id, plan.estimated_tokens) is not None:
+                    logger.info("job_deferred_for_provider_capacity", extra={"job_id": job_id})
+                    return True
+                page_plan_details = record_page_plan(job_id, plan)
+                pages = [pages[page_number - 1] for page_number in plan.selected_pages]
             provider = (
                 FixtureProvider()
                 if job.sample or job.provider == "fixture"
@@ -128,7 +210,11 @@ def run_once() -> bool:
             extraction = extract_with_fallback(job, pages, provider)
             checks = verify(extraction.invoice)
             status, reasons = route(
-                extraction.invoice, checks, settings.confidence_threshold, job.page_count
+                extraction.invoice,
+                checks,
+                settings.confidence_threshold,
+                job.page_count,
+                complete_page_coverage=not plan or not plan.skipped_pages,
             )
             result = {
                 "invoice": extraction.invoice.model_dump(mode="json"),
@@ -150,6 +236,15 @@ def run_once() -> bool:
                     if extraction.provider == "groq"
                     else PROMPT_VERSION,
                     "latency_ms": round((time.monotonic() - start) * 1000),
+                    **(
+                        {
+                            "page_plan": {
+                                **page_plan_details,
+                            }
+                        }
+                        if plan
+                        else {}
+                    ),
                 },
             }
         with Session.begin() as db:

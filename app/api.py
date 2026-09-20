@@ -13,7 +13,6 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
 from app.db import AuditEvent, Job, Session, timestamp
-from app.groq import VISION_PAGE_LIMITS
 from app.samples import SAMPLES, sample_pdf
 from app.storage import DocumentError, document_path, inspect, render
 
@@ -54,6 +53,7 @@ def serialize(job):
         "status": job.status,
         "page_count": job.page_count,
         "created_at": timestamp(job.created_at),
+        "not_before": timestamp(job.not_before) if job.not_before else None,
         "error": job.error,
         "mode": job.result["telemetry"]["provider"] if job.result else job.provider,
         "requested_provider": job.provider,
@@ -81,14 +81,6 @@ def enqueue(data: bytes, filename: str, key: str, sample: str | None = None):
         media_type, pages = inspect(data, filename)
     except DocumentError as exc:
         raise HTTPException(422, str(exc)) from exc
-    if (
-        not sample
-        and settings.provider == "groq"
-        and pages > VISION_PAGE_LIMITS.get(settings.groq_model, 0)
-    ):
-        raise HTTPException(
-            422, "Groq model page limit exceeded; split the document or select another provider"
-        )
     job_id = str(uuid4())
     path = document_path(job_id)
     path.write_bytes(data)
@@ -142,9 +134,7 @@ def configuration():
         "provider": settings.provider,
         "local_fallback_enabled": settings.local_fallback_enabled,
         "max_file_mb": settings.max_file_bytes // 1024**2,
-        "max_pages": min(settings.max_pages, VISION_PAGE_LIMITS.get(settings.groq_model, 0))
-        if settings.provider == "groq"
-        else settings.max_pages,
+        "max_pages": settings.max_pages,
         "samples": [
             {"id": key, "name": value[0], "description": value[1]} for key, value in SAMPLES.items()
         ],

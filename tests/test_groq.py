@@ -117,7 +117,8 @@ def test_groq_worker_and_page_limit(client, monkeypatch):
     from app.providers import Extraction
 
     monkeypatch.setattr(settings, "provider", "groq")
-    assert client.get("/api/v1/config").json()["max_pages"] == 3
+    monkeypatch.setattr(settings, "groq_tokens_per_minute", 20_000)
+    assert client.get("/api/v1/config").json()["max_pages"] == 20
     monkeypatch.setattr(
         GroqProvider, "extract", lambda *a: Extraction(sample_invoice("clean"), "groq", "test")
     )
@@ -134,9 +135,43 @@ def test_groq_worker_and_page_limit(client, monkeypatch):
         for _ in range(4):
             doc.new_page()
         data = doc.tobytes()
-    response = client.post(
+    job = client.post(
         "/api/v1/documents",
         files={"file": ("four.pdf", data)},
         headers={"Idempotency-Key": "too-many"},
+    ).json()
+    assert worker.run_once()
+    saved = client.get(f"/api/v1/jobs/{job['job_id']}").json()
+    assert saved["status"] == "REQUIRES_HUMAN_REVIEW"
+    assert "INCOMPLETE_PAGE_COVERAGE" in saved["result"]["route_reasons"]
+    assert saved["result"]["telemetry"]["page_plan"]["selected_pages"] == [1, 2, 4]
+    assert saved["result"]["telemetry"]["page_plan"]["skipped_pages"] == [3]
+
+
+def test_groq_defers_a_job_before_provider_call_when_token_budget_is_reserved(client, monkeypatch):
+    from app import worker
+    from app.providers import Extraction
+
+    monkeypatch.setattr(settings, "provider", "groq")
+    monkeypatch.setattr(settings, "groq_tokens_per_minute", 6_696)
+    monkeypatch.setattr(
+        GroqProvider, "extract", lambda *a: Extraction(sample_invoice("clean"), "groq", "test")
     )
-    assert response.status_code == 422
+    first = client.post(
+        "/api/v1/documents",
+        files={"file": ("first.pdf", sample_pdf("clean"))},
+        headers={"Idempotency-Key": "capacity-first"},
+    ).json()
+    second = client.post(
+        "/api/v1/documents",
+        files={"file": ("second.pdf", sample_pdf("clean"))},
+        headers={"Idempotency-Key": "capacity-second"},
+    ).json()
+    assert worker.run_once()
+    assert client.get(f"/api/v1/jobs/{first['job_id']}").json()["status"] == "AUTO_APPROVED"
+    assert worker.run_once()
+    deferred = client.get(f"/api/v1/jobs/{second['job_id']}").json()
+    assert deferred["status"] == "QUEUED"
+    assert deferred["not_before"] is not None
+    audit = client.get(f"/api/v1/jobs/{second['job_id']}/audit").json()
+    assert audit[-1]["event"] == "PROVIDER_CAPACITY_DEFERRED"

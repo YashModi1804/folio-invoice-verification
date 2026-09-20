@@ -138,6 +138,10 @@ export default function Document({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Invoice | null>(null);
   const pending = ["QUEUED", "PROCESSING"].includes(job.status);
+  const waitingForCapacity =
+    job.status === "QUEUED" &&
+    job.not_before !== null &&
+    Date.parse(job.not_before) > Date.now();
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
     if (!pending) return;
@@ -287,6 +291,8 @@ export default function Document({
             {pending
               ? recovering
                 ? `Cloud service unavailable. Local AI is processing this document · ${elapsed}s elapsed.`
+                : waitingForCapacity
+                  ? `Waiting for provider capacity. No model request has been made yet.`
                 : `Extracting and independently verifying your document · ${elapsed}s elapsed.`
               : review
                 ? "This record is held for review. Resolve the flagged details before approval."

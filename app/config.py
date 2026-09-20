@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     provider: Literal["fixture", "gemini", "groq", "ollama"] = "fixture"
     groq_api_key: SecretStr = SecretStr("")
     groq_model: str = "qwen/qwen3.8-27b"
+    groq_tokens_per_minute: int = 8_000
+    groq_image_tokens: int = 2_048
+    groq_request_overhead_tokens: int = 1_200
+    groq_output_reserve_tokens: int = 1_400
     ollama_model: str = "qwen3-vl:4b-instruct"
     ollama_timeout_seconds: int = 240
     gemini_api_key: SecretStr = SecretStr("")

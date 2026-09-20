@@ -15,7 +15,11 @@ CORE_FIELDS = (
 
 
 def route(
-    invoice: Invoice, checks: list[Check], threshold: float = 0.85, page_count: int = 20
+    invoice: Invoice,
+    checks: list[Check],
+    threshold: float = 0.85,
+    page_count: int = 20,
+    complete_page_coverage: bool = True,
 ) -> tuple[str, list[str]]:
     reasons = []
     has_invalid_evidence_reference = False
@@ -57,4 +61,6 @@ def route(
             reasons.append(f"{check.code}_{check.state}")
     if not checks:
         reasons.append("NO_VERIFICATION_CHECKS")
+    if not complete_page_coverage:
+        reasons.append("INCOMPLETE_PAGE_COVERAGE")
     return ("REQUIRES_HUMAN_REVIEW" if reasons else "AUTO_APPROVED", reasons)

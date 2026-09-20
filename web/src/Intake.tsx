@@ -114,6 +114,8 @@ export default function Intake({
             ? "Sample mode is active. Custom documents need a configured live provider."
             : provider === "ollama"
               ? "Local AI active. Documents stay on this machine; no cloud API call."
+              : provider === "groq"
+                ? "Groq capacity is reserved before extraction. Longer invoices are planned page by page and held for review if coverage is incomplete."
               : fallback
                 ? `${provider === "groq" ? "Groq" : "Gemini"} processes uploads. If unavailable, local AI is attempted once and clearly labeled.`
                 : "Live provider active. Documents are sent to the configured model."}

@@ -76,3 +76,11 @@ def render(data: bytes, media_type: str) -> list[bytes]:
         output = BytesIO()
         image.convert("RGB").save(output, format="PNG")
         return [output.getvalue()]
+
+
+def page_texts(data: bytes, media_type: str) -> list[str]:
+    """Return native PDF text for local planning; never use it as trusted extraction data."""
+    if media_type != "application/pdf":
+        return [""]
+    with pymupdf.open(stream=data, filetype="pdf") as doc:
+        return [page.get_text() for page in doc]

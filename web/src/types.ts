@@ -57,6 +57,7 @@ export type Job = {
   mode: string;
   requested_provider: string;
   created_at: string;
+  not_before: string | null;
   error: string | null;
   result: {
     invoice: Invoice;
