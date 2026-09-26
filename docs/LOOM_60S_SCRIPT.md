@@ -1,4 +1,8 @@
-# Folio — final 60-second agency demo
+# Folio — earlier storyboard cut (superseded)
+
+This still-image cut was superseded by the
+[continuous live UI recording](LOOM_60S_LIVE.md). Keep this file only as the
+original approved voiceover/storyboard reference.
 
 The finished 1920 × 1080, 30 fps video is
 `output/video/folio-60s-agency-demo.mp4`. It uses captured Folio UI, a saved
