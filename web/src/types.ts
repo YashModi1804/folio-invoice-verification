@@ -41,6 +41,10 @@ export type Telemetry = {
   prompt_version: string;
   schema_version: string;
   pricing_version: string | null;
+  page_plan?: {
+    selected_pages: number[];
+    skipped_pages: number[];
+  };
 };
 export type Job = {
   summary: {

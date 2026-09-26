@@ -75,6 +75,17 @@ function reviewSummary(reasons: string[], failedTotal?: Check, currency?: string
   return summary.length ? summary : ["This record needs a human decision before approval."];
 }
 
+function traceValue(key: string, value: unknown): string {
+  if (value === null || value === undefined) return "Not available";
+  if (key === "page_plan" && typeof value === "object") {
+    const plan = value as { selected_pages?: number[]; skipped_pages?: number[] };
+    const selected = plan.selected_pages?.join(", ") || "none";
+    const skipped = plan.skipped_pages?.join(", ") || "none";
+    return `Selected pages ${selected}; skipped pages ${skipped}`;
+  }
+  return typeof value === "object" ? JSON.stringify(value) : String(value);
+}
+
 export function CheckLedger({ checks }: { checks: Check[] }) {
   return (
     <section className="panel section-gap">
@@ -565,7 +576,7 @@ export default function Document({
                 {Object.entries(job.result.telemetry).map(([key, value]) => (
                   <div key={key}>
                     <dt>{humanize(key)}</dt>
-                    <dd>{value === null ? "Not available" : String(value)}</dd>
+                    <dd>{traceValue(key, value)}</dd>
                   </div>
                 ))}
                 <div className="wide">
