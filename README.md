@@ -200,6 +200,7 @@ Schedule that command in your deployment if automatic expiration is required.
 ## Sales handoff
 
 See [the live document pack and Loom plan](docs/DEMO_PACK.md),
+[the finished 60-second video script](docs/LOOM_60S_SCRIPT.md),
 [the offline demo script](docs/DEMO.md), [verification report](docs/ACCEPTANCE.md),
 [SRS](SRS.md), and [build plan](BUILD_PLAN.md).
 
