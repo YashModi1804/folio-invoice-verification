@@ -1,20 +1,26 @@
-# Folio — 30-second silent demo and voiceover
+# Folio — 30-second narrated agency demo
 
-Use the saved **Deltaforge** result. It is a deliberately synthetic, three-page challenge
-invoice processed in Groq live mode. It demonstrates the safe outcome for incomplete page
-coverage and a $50 printed-total discrepancy. Say it is an evaluation document if asked;
-never present a fixture, local fallback, or synthetic source as a customer invoice.
+The finished video is `output/video/folio-30s-voiced-demo.mp4` (1920 × 1080, 30 fps).
+It uses Playwright captures of the actual Folio workspace, timed transitions, captions,
+and the free local macOS **Daniel** synthetic voice. The video uses a saved Groq
+result from a **synthetic evaluation invoice**; recording made no provider request.
 
-| Time | Screen action | Voiceover |
+| Time | Visual | Spoken line |
 | --- | --- | --- |
-| 0–7s | Hold the complex source page, extracted fields, and `GROQ LIVE` label. | “This is Folio: an AI invoice verification engine. It keeps the source beside structured extraction.” |
-| 7–20s | Scroll to the verification ledger. Pause on the incomplete subtotal and the failed total. | “Extraction is never approval. Folio checks every captured line with decimal arithmetic; incomplete coverage and a fifty-dollar difference stop automation.” |
-| 20–30s | Scroll to the reviewer decision and processing trace. | “A reviewer records the decision, while the live provider trace preserves latency and token telemetry. Approved records are ready for an ERP handoff.” |
+| 0–5s | Three-page Deltaforge document beside extracted fields and the review banner. | “Meet Folio, an invoice verification engine for operations teams.” |
+| 5–11s | Source invoice final page and the extracted totals side by side. | “This three-page synthetic invoice was extracted with Groq. The source stays beside the captured data.” |
+| 11–17s | Audit trail and passed line checks in the independent ledger. | “Folio checks each line with decimal arithmetic and records the processing path.” |
+| 17–24s | Incomplete subtotal, $50 total variance, and the reviewer decision. | “Page coverage is incomplete, and the printed total is fifty dollars out. Automation stops for human review.” |
+| 24–30s | Reviewer decision and provider trace, including tokens, latency, and selected pages. | “Audit and provider trace stay visible. Approved records export through a versioned ERP contract.” |
 
-## Recording notes
+The top-right label says **Recorded Groq · Synthetic demo** throughout. The source is
+an evaluation challenge, not a customer invoice. The record is held for review;
+the final line describes what Folio can do with *approved* records through its
+versioned ERP export endpoint, not an export of this held record.
 
-- Use the prepared result—no upload or provider wait appears in the recording.
-- Keep the browser focused on Folio and hide unrelated tabs or notifications.
-- Record silently at 30 seconds. Add voiceover afterward using the script above.
-- Do not claim universal invoice accuracy, zero-cost inference, or direct ERP writes. Say
-  “ERP-ready handoff” because Folio exports approved records for a client connector.
+## Rebuild
+
+Start the local app with `.venv/bin/python scripts/dev.py`, then run
+`scripts/capture_folio_demo.mjs` followed by `scripts/render_folio_demo.mjs`
+using Node with Playwright available. The renderer also needs the free macOS `say`
+voice and FFmpeg. Intermediate frames and audio remain under ignored `output/video/`.
