@@ -115,7 +115,13 @@ def build():
     r.font.name = "Aptos Display"
     r.font.size = Pt(25)
     r.font.color.rgb = RGBColor.from_string("000000")
-    subtitle = para(doc, "A two-minute setup and a 60-second proof of reliable document automation", 11, TEAL, space_after=10)
+    subtitle = para(
+        doc,
+        "A two-minute setup and a 60-second proof of reliable document automation",
+        11,
+        TEAL,
+        space_after=10,
+    )
     subtitle.runs[0].italic = True
 
     table = doc.add_table(rows=1, cols=3)
@@ -135,41 +141,95 @@ def build():
         p = cell.paragraphs[0]
         p.paragraph_format.space_after = Pt(1)
         a = p.add_run(label.upper())
-        a.bold = True; a.font.size = Pt(7.5); a.font.color.rgb = RGBColor.from_string(TEAL)
-        p = cell.add_paragraph(); p.paragraph_format.space_after = Pt(1)
-        a = p.add_run(value); a.bold = True; a.font.size = Pt(10.3); a.font.color.rgb = RGBColor.from_string(INK)
-        p = cell.add_paragraph(); p.paragraph_format.space_after = Pt(0)
-        a = p.add_run(note); a.font.size = Pt(8.1); a.font.color.rgb = RGBColor.from_string("52666A")
+        a.bold = True
+        a.font.size = Pt(7.5)
+        a.font.color.rgb = RGBColor.from_string(TEAL)
+        p = cell.add_paragraph()
+        p.paragraph_format.space_after = Pt(1)
+        a = p.add_run(value)
+        a.bold = True
+        a.font.size = Pt(10.3)
+        a.font.color.rgb = RGBColor.from_string(INK)
+        p = cell.add_paragraph()
+        p.paragraph_format.space_after = Pt(0)
+        a = p.add_run(note)
+        a.font.size = Pt(8.1)
+        a.font.color.rgb = RGBColor.from_string("52666A")
 
     heading(doc, "What Folio proves")
-    para(doc, "Folio is an agency-ready document-processing foundation. A vision model proposes structured invoice data; deterministic Python verifies calculations and routing policy; a reviewer resolves exceptions. The original extraction is never overwritten.")
-    para(doc, "The one sentence to remember: The model extracts. Deterministic code verifies. A human resolves exceptions.", 10.4, TEAL, bold=True, space_after=6)
+    para(
+        doc,
+        "Folio is an agency-ready document-processing foundation. A vision model proposes structured invoice data; deterministic Python verifies calculations and routing policy; a reviewer resolves exceptions. The original extraction is never overwritten.",
+    )
+    para(
+        doc,
+        "The one sentence to remember: The model extracts. Deterministic code verifies. A human resolves exceptions.",
+        10.4,
+        TEAL,
+        bold=True,
+        space_after=6,
+    )
 
     heading(doc, "Architecture and decision flow")
     flow = doc.add_table(rows=1, cols=5)
     flow.autofit = False
     labels = ["Upload", "Worker", "AI extraction", "Verify", "Decision"]
-    details = ["PDF, PNG, JPG or WEBP\nprivate local storage", "Durable job\nseparate worker", "Groq JSON mode\nor local vision", "Pydantic + Decimal\nmath and policy", "Auto approve\nor human review"]
+    details = [
+        "PDF, PNG, JPG or WEBP\nprivate local storage",
+        "Durable job\nseparate worker",
+        "Groq JSON mode\nor local vision",
+        "Pydantic + Decimal\nmath and policy",
+        "Auto approve\nor human review",
+    ]
     for i, cell in enumerate(flow.rows[0].cells):
         shade(cell, "F6F8F7" if i % 2 else PALE)
         cell.text = ""
-        p = cell.paragraphs[0]; p.alignment = WD_ALIGN_PARAGRAPH.CENTER; p.paragraph_format.space_after = Pt(1)
-        r = p.add_run(labels[i]); r.bold = True; r.font.size = Pt(9.5); r.font.color.rgb = RGBColor.from_string(INK)
-        p = cell.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER; p.paragraph_format.space_after = Pt(0)
-        r = p.add_run(details[i]); r.font.size = Pt(7.7); r.font.color.rgb = RGBColor.from_string("52666A")
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_after = Pt(1)
+        r = p.add_run(labels[i])
+        r.bold = True
+        r.font.size = Pt(9.5)
+        r.font.color.rgb = RGBColor.from_string(INK)
+        p = cell.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_after = Pt(0)
+        r = p.add_run(details[i])
+        r.font.size = Pt(7.7)
+        r.font.color.rgb = RGBColor.from_string("52666A")
     borders(flow)
-    para(doc, "Every run records provider, model, prompt version, token usage when available, latency, correlation ID, checks, route reason and audit events. Idempotency prevents duplicate jobs; the worker makes one cloud request per job, never a hidden retry loop.", 9.6, space_after=4)
+    para(
+        doc,
+        "Every run records provider, model, prompt version, token usage when available, latency, correlation ID, checks, route reason and audit events. Idempotency prevents duplicate jobs; the worker makes one cloud request per job, never a hidden retry loop.",
+        9.6,
+        space_after=4,
+    )
 
     heading(doc, "Technical essentials")
     tech = doc.add_table(rows=1, cols=2)
     tech.autofit = False
     rows = [
         ("API and UI", "FastAPI, Pydantic v2, React, TypeScript, Vite"),
-        ("Data and jobs", "SQLite for local demo; SQLAlchemy; database-backed worker; Alembic migrations"),
-        ("Document handling", "PyMuPDF page rendering; file limits; MIME inspection; private local storage"),
-        ("Verification", "Python Decimal arithmetic with 0.01 tolerance; line, subtotal and total checks"),
-        ("Review and audit", "Separate human decision snapshot; immutable original extraction; append-only audit events"),
-        ("Providers", "Groq Qwen 3.8 27B primary; Gemini available; Ollama Qwen 3 VL 4B local recovery"),
+        (
+            "Data and jobs",
+            "SQLite for local demo; SQLAlchemy; database-backed worker; Alembic migrations",
+        ),
+        (
+            "Document handling",
+            "PyMuPDF page rendering; file limits; MIME inspection; private local storage",
+        ),
+        (
+            "Verification",
+            "Python Decimal arithmetic with 0.01 tolerance; line, subtotal and total checks",
+        ),
+        (
+            "Review and audit",
+            "Separate human decision snapshot; immutable original extraction; append-only audit events",
+        ),
+        (
+            "Providers",
+            "Groq Qwen 3.8 27B primary; Gemini available; Ollama Qwen 3 VL 4B local recovery",
+        ),
     ]
     for row_index, (key, value) in enumerate(rows):
         cells = tech.add_row().cells
@@ -182,34 +242,80 @@ def build():
 
     doc.add_page_break()
     heading(doc, "The recorded proof")
-    para(doc, "Use the prepared two-page Alder Office Supply invoice. It is synthetic, deliberately contains a printed-total discrepancy, and makes the guardrail visible without manufacturing a failure live.")
+    para(
+        doc,
+        "Use the prepared two-page Alder Office Supply invoice. It is synthetic, deliberately contains a printed-total discrepancy, and makes the guardrail visible without manufacturing a failure live.",
+    )
 
     scenario = doc.add_table(rows=1, cols=4)
     scenario.autofit = False
     headers = ["Extracted", "Printed total", "Calculated total", "Decision"]
-    values = ["6 line items\nSubtotal 1,700", "USD 1,850", "USD 1,800", "Review required\nDifference USD 50"]
+    values = [
+        "6 line items\nSubtotal 1,700",
+        "USD 1,850",
+        "USD 1,800",
+        "Review required\nDifference USD 50",
+    ]
     for cell, label, value in zip(scenario.rows[0].cells, headers, values, strict=True):
         shade(cell, INK)
         cell.text = ""
-        p = cell.paragraphs[0]; p.alignment = WD_ALIGN_PARAGRAPH.CENTER; p.paragraph_format.space_after = Pt(2)
-        r = p.add_run(label.upper()); r.bold = True; r.font.size = Pt(7.2); r.font.color.rgb = RGBColor(255, 255, 255)
-        p = cell.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER; p.paragraph_format.space_after = Pt(0)
-        r = p.add_run(value); r.bold = True; r.font.size = Pt(9.4); r.font.color.rgb = RGBColor.from_string("FFFFFF")
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_after = Pt(2)
+        r = p.add_run(label.upper())
+        r.bold = True
+        r.font.size = Pt(7.2)
+        r.font.color.rgb = RGBColor(255, 255, 255)
+        p = cell.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_after = Pt(0)
+        r = p.add_run(value)
+        r.bold = True
+        r.font.size = Pt(9.4)
+        r.font.color.rgb = RGBColor.from_string("FFFFFF")
     borders(scenario, INK)
 
     heading(doc, "60 second recording sequence")
     script = doc.add_table(rows=1, cols=3)
     script.autofit = False
     widths = [0.75, 2.12, 3.35]
-    for cell, label, width in zip(script.rows[0].cells, ["Time", "Show", "Say"], widths, strict=True):
-        cell.width = Inches(width); shade(cell, TEAL); cell_text(cell, label, True, "FFFFFF", 8.5)
+    for cell, label, width in zip(
+        script.rows[0].cells, ["Time", "Show", "Say"], widths, strict=True
+    ):
+        cell.width = Inches(width)
+        shade(cell, TEAL)
+        cell_text(cell, label, True, "FFFFFF", 8.5)
     steps = [
-        ("0–8s", "Upload Alder PDF", "The model reads the invoice. It does not get to approve its own work."),
-        ("8–18s", "Source and extracted fields", "This scanned, two-page invoice has six line items. The extraction is structured and traceable."),
-        ("18–32s", "Total evidence and ledger", "The printed total is 1,850. Decimal arithmetic calculates 1,800. That 50-dollar difference blocks approval."),
-        ("32–45s", "Reviewer decision", "An operator resolves the exception. The original extraction remains preserved."),
-        ("45–54s", "Audit trail and trace", "Provider, model, latency, checks and human decision are recorded for engineering and operations."),
-        ("54–60s", "Saved clean record", "The same foundation can be adapted to your client’s workflow and system of record."),
+        (
+            "0–8s",
+            "Upload Alder PDF",
+            "The model reads the invoice. It does not get to approve its own work.",
+        ),
+        (
+            "8–18s",
+            "Source and extracted fields",
+            "This scanned, two-page invoice has six line items. The extraction is structured and traceable.",
+        ),
+        (
+            "18–32s",
+            "Total evidence and ledger",
+            "The printed total is 1,850. Decimal arithmetic calculates 1,800. That 50-dollar difference blocks approval.",
+        ),
+        (
+            "32–45s",
+            "Reviewer decision",
+            "An operator resolves the exception. The original extraction remains preserved.",
+        ),
+        (
+            "45–54s",
+            "Audit trail and trace",
+            "Provider, model, latency, checks and human decision are recorded for engineering and operations.",
+        ),
+        (
+            "54–60s",
+            "Saved clean record",
+            "The same foundation can be adapted to your client’s workflow and system of record.",
+        ),
     ]
     for i, row in enumerate(steps):
         cells = script.add_row().cells
@@ -230,7 +336,12 @@ def build():
         bullet(doc, item)
 
     heading(doc, "Known boundaries")
-    para(doc, "Folio is a high-quality sales demo and reusable integration base, not a certified accounting product. Groq Qwen 3.8 permits three page images per request. Handwritten or blurry documents should be treated as review-first until measured against a client-specific set. Model confidence is a heuristic, not proof. The provider sees documents when live cloud mode is selected; use approved data terms before client uploads.", 9.2, space_after=0)
+    para(
+        doc,
+        "Folio is a high-quality sales demo and reusable integration base, not a certified accounting product. Groq Qwen 3.8 permits three page images per request. Handwritten or blurry documents should be treated as review-first until measured against a client-specific set. Model confidence is a heuristic, not proof. The provider sees documents when live cloud mode is selected; use approved data terms before client uploads.",
+        9.2,
+        space_after=0,
+    )
 
     doc.save(OUTPUT)
     print(OUTPUT)

@@ -17,6 +17,7 @@ def approved_export(job, decision: ReviewDecision | None) -> dict:
     result = job.result or {}
     invoice = decision.corrected_invoice if decision else result["invoice"]
     checks = decision.checks if decision else result["checks"]
+
     def value(field: str):
         return invoice[field]["value"]
 
