@@ -186,7 +186,7 @@ GitHub Pages cannot run the FastAPI API, database, or worker. Do not put an oper
 token or provider key in the Pages build. To deploy live extraction, use a separate
 backend host with private credentials and persistent document/database storage.
 
-To rebuild the public assets locally, run `.venv/bin/python scripts/export_public_preview.py`
+To rebuild the public assets locally, run `.venv/bin/python -m scripts.export_public_preview`
 then `FOLIO_PUBLIC_PREVIEW=1 VITE_FOLIO_PUBLIC_PREVIEW=true pnpm --dir web build`.
 The Pages workflow performs both steps on `main` and publishes only `web/dist`.
 

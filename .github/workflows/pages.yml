@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.lock
-      - run: python scripts/export_public_preview.py
+      - run: python -m scripts.export_public_preview
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
