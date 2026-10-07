@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Check, X } from "lucide-react";
 import { request } from "./api";
 import type { Invoice, Job } from "./types";
+import { PUBLIC_PREVIEW } from "./preview";
 
 export default function Review({
   job,
@@ -36,9 +37,11 @@ export default function Review({
     <section className="panel section-gap">
       <div className="panel-head">
         <div>
-          <h2>Your decision, on record</h2>
+          <h2>{PUBLIC_PREVIEW ? "Try a review decision" : "Your decision, on record"}</h2>
           <p>
-            Approval accepts responsibility for any remaining discrepancies.
+            {PUBLIC_PREVIEW
+              ? "This sample decision stays in this browser tab and is not saved to a server."
+              : "Approval accepts responsibility for any remaining discrepancies."}
           </p>
         </div>
       </div>

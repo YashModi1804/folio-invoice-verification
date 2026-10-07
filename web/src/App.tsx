@@ -18,10 +18,11 @@ import { request } from "./api";
 import { labels, type Job } from "./types";
 import Intake from "./Intake";
 import Document from "./Document";
+import { PUBLIC_PREVIEW } from "./preview";
 
 export default function App() {
   const [token, setToken] = useState(
-    sessionStorage.getItem("folio-token") ?? "",
+    PUBLIC_PREVIEW ? "public-preview" : sessionStorage.getItem("folio-token") ?? "",
   );
   const [tokenInput, setTokenInput] = useState("");
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -164,8 +165,12 @@ export default function App() {
           <strong>Trust is a workflow.</strong>Every decision has its evidence.
           <br />
           Every correction leaves a trail.
-          <a href="/docs" target="_blank" rel="noreferrer">
-            API documentation
+          <a
+            href={PUBLIC_PREVIEW ? "https://github.com/YashModi1804/folio-invoice-verification" : "/docs"}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {PUBLIC_PREVIEW ? "View source code" : "API documentation"}
             <ArrowUpRight size={13} />
           </a>
         </div>
@@ -193,22 +198,32 @@ export default function App() {
                   : "LIVE WORKSPACE"}
             </span>
             <span className="avatar">OP</span>
-            <button
-              className="ghost"
-              aria-label="Sign out"
-              onClick={() => {
-                sessionStorage.removeItem("folio-token");
-                setToken("");
-                setReady(false);
-                setSelected(null);
-                setJobs([]);
-              }}
-            >
-              <LogOut size={15} />
-            </button>
+            {!PUBLIC_PREVIEW && (
+              <button
+                className="ghost"
+                aria-label="Sign out"
+                onClick={() => {
+                  sessionStorage.removeItem("folio-token");
+                  setToken("");
+                  setReady(false);
+                  setSelected(null);
+                  setJobs([]);
+                }}
+              >
+                <LogOut size={15} />
+              </button>
+            )}
           </div>
         </header>
         <div className="content">
+          {PUBLIC_PREVIEW && (
+            <div className="preview-banner" role="status">
+              <strong>Public sample preview</strong>
+              <span>
+                Synthetic invoices only · No live AI or server storage · Review decisions reset on refresh
+              </span>
+            </div>
+          )}
           {error && (
             <div className="error" role="alert">
               <span>{error}</span>
@@ -301,6 +316,7 @@ export default function App() {
                 <div id="intake">
                   <Intake
                     token={token}
+                    publicPreview={PUBLIC_PREVIEW}
                     provider={provider}
                     fallback={fallback}
                     maxPages={maxPages}
@@ -406,7 +422,9 @@ export default function App() {
                           ? "No matching documents."
                           : view === "review"
                             ? "All clear. No documents are waiting for review."
-                            : "Your register starts here. Try a sample or upload your first invoice."}
+                            : PUBLIC_PREVIEW
+                              ? "Select a synthetic sample to explore the workflow."
+                              : "Your register starts here. Try a sample or upload your first invoice."}
                     </div>
                   )}
                 </div>
@@ -420,7 +438,9 @@ export default function App() {
           <footer className="footer">
             <span>
               <ShieldCheck size={12} />
-              Extraction assisted by AI. Approval governed by checks.
+              {PUBLIC_PREVIEW
+                ? "Synthetic examples · Real verification rules · No model call"
+                : "Extraction assisted by AI. Approval governed by checks."}
             </span>
             <span>
               <CircleHelp size={12} />

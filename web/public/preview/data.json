@@ -1,0 +1,555 @@
+[
+  {
+    "kind": "clean",
+    "job": {
+      "job_id": "preview-clean",
+      "correlation_id": "synthetic-clean",
+      "filename": "northline-clean.pdf",
+      "status": "AUTO_APPROVED",
+      "page_count": 2,
+      "mode": "fixture",
+      "requested_provider": "fixture",
+      "created_at": "",
+      "not_before": null,
+      "error": null,
+      "summary": {
+        "vendor_name": "Northline Studio",
+        "invoice_number": "NS-2026-041",
+        "total_amount": "1250.00",
+        "currency": "USD"
+      },
+      "result": {
+        "invoice": {
+          "vendor_name": {
+            "value": "Northline Studio",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "Northline Studio"
+              }
+            ]
+          },
+          "vendor_tax_id": {
+            "value": null,
+            "confidence": 0.0,
+            "evidence": []
+          },
+          "invoice_number": {
+            "value": "NS-2026-041",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "NS-2026-041"
+              }
+            ]
+          },
+          "invoice_date": {
+            "value": "2026-09-14",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "2026-09-14"
+              }
+            ]
+          },
+          "currency": {
+            "value": "USD",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "USD"
+              }
+            ]
+          },
+          "subtotal": {
+            "value": "1200.00",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "1200.00"
+              }
+            ]
+          },
+          "tax_amount": {
+            "value": "50.00",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "50.00"
+              }
+            ]
+          },
+          "shipping_amount": {
+            "value": "0.00",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "0.00"
+              }
+            ]
+          },
+          "discount_amount": {
+            "value": "0.00",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "0.00"
+              }
+            ]
+          },
+          "total_amount": {
+            "value": "1250.00",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "1250.00"
+              }
+            ]
+          },
+          "line_items": [
+            {
+              "description": "Brand strategy workshop",
+              "quantity": "2",
+              "unit_price": "400.00",
+              "line_total": "800.00"
+            },
+            {
+              "description": "Design system handoff",
+              "quantity": "1",
+              "unit_price": "400.00",
+              "line_total": "400.00"
+            }
+          ],
+          "ambiguous_document": false,
+          "tax_inclusive": false
+        },
+        "checks": [
+          {
+            "code": "LINE_1",
+            "state": "PASS",
+            "expected": "800.00",
+            "observed": "800.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_2",
+            "state": "PASS",
+            "expected": "400.00",
+            "observed": "400.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "SUBTOTAL",
+            "state": "PASS",
+            "expected": "1200.00",
+            "observed": "1200.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "TOTAL",
+            "state": "PASS",
+            "expected": "1250.00",
+            "observed": "1250.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          }
+        ],
+        "route_reasons": [],
+        "math_validated": true,
+        "telemetry": {
+          "provider": "fixture",
+          "model": "synthetic-v1",
+          "latency_ms": 0,
+          "input_tokens": null,
+          "output_tokens": null,
+          "estimated_cost_usd": "0",
+          "prompt_version": "fixture-v1",
+          "schema_version": "1",
+          "pricing_version": "fixture-no-api"
+        }
+      }
+    }
+  },
+  {
+    "kind": "variance",
+    "job": {
+      "job_id": "preview-variance",
+      "correlation_id": "synthetic-variance",
+      "filename": "northline-variance.pdf",
+      "status": "REQUIRES_HUMAN_REVIEW",
+      "page_count": 2,
+      "mode": "fixture",
+      "requested_provider": "fixture",
+      "created_at": "",
+      "not_before": null,
+      "error": null,
+      "summary": {
+        "vendor_name": "Northline Studio",
+        "invoice_number": "NS-2026-041",
+        "total_amount": "1300.00",
+        "currency": "USD"
+      },
+      "result": {
+        "invoice": {
+          "vendor_name": {
+            "value": "Northline Studio",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "Northline Studio"
+              }
+            ]
+          },
+          "vendor_tax_id": {
+            "value": null,
+            "confidence": 0.0,
+            "evidence": []
+          },
+          "invoice_number": {
+            "value": "NS-2026-041",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "NS-2026-041"
+              }
+            ]
+          },
+          "invoice_date": {
+            "value": "2026-09-14",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "2026-09-14"
+              }
+            ]
+          },
+          "currency": {
+            "value": "USD",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "USD"
+              }
+            ]
+          },
+          "subtotal": {
+            "value": "1200.00",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "1200.00"
+              }
+            ]
+          },
+          "tax_amount": {
+            "value": "50.00",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "50.00"
+              }
+            ]
+          },
+          "shipping_amount": {
+            "value": "0.00",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "0.00"
+              }
+            ]
+          },
+          "discount_amount": {
+            "value": "0.00",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "0.00"
+              }
+            ]
+          },
+          "total_amount": {
+            "value": "1300.00",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "1300.00"
+              }
+            ]
+          },
+          "line_items": [
+            {
+              "description": "Brand strategy workshop",
+              "quantity": "2",
+              "unit_price": "400.00",
+              "line_total": "800.00"
+            },
+            {
+              "description": "Design system handoff",
+              "quantity": "1",
+              "unit_price": "400.00",
+              "line_total": "400.00"
+            }
+          ],
+          "ambiguous_document": false,
+          "tax_inclusive": false
+        },
+        "checks": [
+          {
+            "code": "LINE_1",
+            "state": "PASS",
+            "expected": "800.00",
+            "observed": "800.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_2",
+            "state": "PASS",
+            "expected": "400.00",
+            "observed": "400.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "SUBTOTAL",
+            "state": "PASS",
+            "expected": "1200.00",
+            "observed": "1200.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "TOTAL",
+            "state": "FAIL",
+            "expected": "1250.00",
+            "observed": "1300.00",
+            "variance": "50.00",
+            "tolerance": "0.01"
+          }
+        ],
+        "route_reasons": [
+          "TOTAL_FAIL"
+        ],
+        "math_validated": false,
+        "telemetry": {
+          "provider": "fixture",
+          "model": "synthetic-v1",
+          "latency_ms": 0,
+          "input_tokens": null,
+          "output_tokens": null,
+          "estimated_cost_usd": "0",
+          "prompt_version": "fixture-v1",
+          "schema_version": "1",
+          "pricing_version": "fixture-no-api"
+        }
+      }
+    }
+  },
+  {
+    "kind": "uncertain",
+    "job": {
+      "job_id": "preview-uncertain",
+      "correlation_id": "synthetic-uncertain",
+      "filename": "northline-uncertain.pdf",
+      "status": "REQUIRES_HUMAN_REVIEW",
+      "page_count": 2,
+      "mode": "fixture",
+      "requested_provider": "fixture",
+      "created_at": "",
+      "not_before": null,
+      "error": null,
+      "summary": {
+        "vendor_name": "Northline Studio",
+        "invoice_number": "NS-2026-041",
+        "total_amount": "1250.00",
+        "currency": "USD"
+      },
+      "result": {
+        "invoice": {
+          "vendor_name": {
+            "value": "Northline Studio",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "Northline Studio"
+              }
+            ]
+          },
+          "vendor_tax_id": {
+            "value": null,
+            "confidence": 0.0,
+            "evidence": []
+          },
+          "invoice_number": {
+            "value": "NS-2026-041",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "NS-2026-041"
+              }
+            ]
+          },
+          "invoice_date": {
+            "value": "2026-09-14",
+            "confidence": 0.62,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "2026-09-14"
+              }
+            ]
+          },
+          "currency": {
+            "value": "USD",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "USD"
+              }
+            ]
+          },
+          "subtotal": {
+            "value": "1200.00",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "1200.00"
+              }
+            ]
+          },
+          "tax_amount": {
+            "value": "50.00",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "50.00"
+              }
+            ]
+          },
+          "shipping_amount": {
+            "value": "0.00",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "0.00"
+              }
+            ]
+          },
+          "discount_amount": {
+            "value": "0.00",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "0.00"
+              }
+            ]
+          },
+          "total_amount": {
+            "value": "1250.00",
+            "confidence": 0.98,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "1250.00"
+              }
+            ]
+          },
+          "line_items": [
+            {
+              "description": "Brand strategy workshop",
+              "quantity": "2",
+              "unit_price": "400.00",
+              "line_total": "800.00"
+            },
+            {
+              "description": "Design system handoff",
+              "quantity": "1",
+              "unit_price": "400.00",
+              "line_total": "400.00"
+            }
+          ],
+          "ambiguous_document": false,
+          "tax_inclusive": false
+        },
+        "checks": [
+          {
+            "code": "LINE_1",
+            "state": "PASS",
+            "expected": "800.00",
+            "observed": "800.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_2",
+            "state": "PASS",
+            "expected": "400.00",
+            "observed": "400.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "SUBTOTAL",
+            "state": "PASS",
+            "expected": "1200.00",
+            "observed": "1200.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "TOTAL",
+            "state": "PASS",
+            "expected": "1250.00",
+            "observed": "1250.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          }
+        ],
+        "route_reasons": [
+          "LOW_CONFIDENCE_INVOICE_DATE"
+        ],
+        "math_validated": true,
+        "telemetry": {
+          "provider": "fixture",
+          "model": "synthetic-v1",
+          "latency_ms": 0,
+          "input_tokens": null,
+          "output_tokens": null,
+          "estimated_cost_usd": "0",
+          "prompt_version": "fixture-v1",
+          "schema_version": "1",
+          "pricing_version": "fixture-no-api"
+        }
+      }
+    }
+  }
+]

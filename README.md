@@ -177,6 +177,19 @@ errors, interrupted jobs, source retention, and redacted API errors.
 
 ## Deployment foundation
 
+The [GitHub Pages preview](https://yashmodi1804.github.io/folio-invoice-verification/)
+is a public, sample-only walkthrough. It uses three synthetic invoices exported by
+`scripts/export_public_preview.py` from the same Python verifier and routing policy.
+It makes no AI calls, accepts no private uploads, and keeps trial review decisions
+only in the current browser tab. Its source pages and result JSON are public assets.
+GitHub Pages cannot run the FastAPI API, database, or worker. Do not put an operator
+token or provider key in the Pages build. To deploy live extraction, use a separate
+backend host with private credentials and persistent document/database storage.
+
+To rebuild the public assets locally, run `.venv/bin/python scripts/export_public_preview.py`
+then `FOLIO_PUBLIC_PREVIEW=1 VITE_FOLIO_PUBLIC_PREVIEW=true pnpm --dir web build`.
+The Pages workflow performs both steps on `main` and publishes only `web/dist`.
+
 `compose.yaml` provides PostgreSQL, migration, API, and worker services with shared
 private source storage. Set a strong `OPERATOR_TOKEN` and `POSTGRES_PASSWORD` in `.env`,
 then run `docker compose up --build`. Ports bind to localhost by default. Docker was
@@ -203,4 +216,3 @@ See [the live document pack and Loom plan](docs/DEMO_PACK.md),
 [the continuous 60-second live demo](docs/LOOM_60S_LIVE.md),
 [the offline demo script](docs/DEMO.md), [verification report](docs/ACCEPTANCE.md),
 [SRS](SRS.md), and [build plan](BUILD_PLAN.md).
-

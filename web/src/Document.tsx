@@ -21,6 +21,7 @@ import {
   type Job,
 } from "./types";
 import Review from "./Review";
+import { PUBLIC_PREVIEW } from "./preview";
 
 const fieldNames = [
   "vendor_name",
@@ -92,7 +93,11 @@ export function CheckLedger({ checks }: { checks: Check[] }) {
       <div className="panel-head">
         <div>
           <h2>Verification ledger</h2>
-          <p>Calculated independently with decimal arithmetic</p>
+          <p>
+            {PUBLIC_PREVIEW
+              ? "Precomputed by Folio's Python decimal verifier"
+              : "Calculated independently with decimal arithmetic"}
+          </p>
         </div>
         <ShieldCheck size={19} />
       </div>
@@ -194,14 +199,14 @@ export default function Document({
       .then((value) => {
         url = value;
         if (active) setImage(value);
-        else URL.revokeObjectURL(value);
+        else if (value.startsWith("blob:")) URL.revokeObjectURL(value);
       })
       .catch((error) => {
         if (active) setImageError(error.message);
       });
     return () => {
       active = false;
-      if (url) URL.revokeObjectURL(url);
+      if (url.startsWith("blob:")) URL.revokeObjectURL(url);
     };
   }, [job.job_id, page, token]);
   useEffect(() => {
@@ -384,10 +389,11 @@ export default function Document({
             </div>
             {evidence && (
               <div className="evidence">
-                <strong>Model-cited evidence:</strong> “{evidence}”<br />
+                <strong>{PUBLIC_PREVIEW ? "Sample evidence:" : "Model-cited evidence:"}</strong> “{evidence}”<br />
                 <span className="muted">
-                  Check against the source page; citations are not independently
-                  verified.
+                  {PUBLIC_PREVIEW
+                    ? "This citation is part of a synthetic fixture, not a live extraction."
+                    : "Check against the source page; citations are not independently verified."}
                 </span>
               </div>
             )}
@@ -438,17 +444,21 @@ export default function Document({
                       ? "Correct extracted fields"
                       : decision
                         ? "Reviewed record"
-                        : "Extracted details"}
+                        : PUBLIC_PREVIEW
+                          ? "Sample details"
+                          : "Extracted details"}
                   </h2>
                   <p>
                     {editing
                       ? "Checks below show the original extraction until you save."
                       : decision
-                        ? "Human decision recorded · original retained"
+                        ? PUBLIC_PREVIEW
+                          ? "Preview decision in this tab · original sample retained"
+                          : "Human decision recorded · original retained"
                         : "Select a confidence label to inspect source evidence"}
                   </p>
                 </div>
-                {review && (
+                {review && !PUBLIC_PREVIEW && (
                   <button
                     onClick={() => {
                       setDraft(structuredClone(job.result!.invoice));

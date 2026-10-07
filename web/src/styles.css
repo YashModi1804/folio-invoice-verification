@@ -90,6 +90,30 @@ a {
 .muted {
   color: var(--muted);
 }
+.preview-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  padding: 11px 15px;
+  margin-bottom: 24px;
+  border: 1px solid #d7dfd3;
+  border-radius: 8px;
+  background: #edf2e9;
+  color: #284b40;
+  font-size: 12px;
+}
+.preview-banner strong {
+  white-space: nowrap;
+}
+.preview-dropzone {
+  cursor: default;
+}
+.preview-dropzone small {
+  display: block;
+  margin-top: 10px;
+  color: var(--muted);
+}
 .eyebrow {
   font-size: 10px;
   letter-spacing: 1.8px;

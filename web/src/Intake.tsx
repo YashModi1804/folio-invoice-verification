@@ -17,6 +17,7 @@ export default function Intake({
   provider,
   fallback,
   maxPages,
+  publicPreview,
 }: {
   token: string;
   onCreated: (job: Job) => void;
@@ -24,6 +25,7 @@ export default function Intake({
   provider: string;
   fallback: boolean;
   maxPages: number;
+  publicPreview: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -73,8 +75,16 @@ export default function Intake({
             <p>Extract the details. Verify the numbers. Keep the evidence.</p>
           </div>
         </div>
-        <div
-          className={`dropzone ${dragging ? "drag" : ""}`}
+        {publicPreview ? (
+          <div className="dropzone preview-dropzone">
+            <div className="upload-icon"><ScanLine size={20} /></div>
+            <h3>Start with a synthetic invoice</h3>
+            <p>Choose a scenario below to inspect evidence, math checks, and review routing.</p>
+            <small>Private document uploads are available in the hosted API installation.</small>
+          </div>
+        ) : (
+          <div
+            className={`dropzone ${dragging ? "drag" : ""}`}
           onDragOver={(e) => {
             e.preventDefault();
             setDragging(true);
@@ -102,7 +112,8 @@ export default function Intake({
             accept=".pdf,.png,.jpg,.jpeg,.webp"
             onChange={(e) => void upload(e.target.files?.[0])}
           />
-        </div>
+          </div>
+        )}
         <p
           style={{
             padding: "0 22px 18px",
@@ -110,7 +121,9 @@ export default function Intake({
             color: "var(--muted)",
           }}
         >
-          {provider === "fixture"
+          {publicPreview
+            ? "Public preview: precomputed synthetic extraction. No inference, uploads, or server persistence."
+            : provider === "fixture"
             ? "Sample mode is active. Custom documents need a configured live provider."
             : provider === "ollama"
               ? "Local AI active. Documents stay on this machine; no cloud API call."
