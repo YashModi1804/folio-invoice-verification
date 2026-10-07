@@ -33,6 +33,7 @@ export default function App() {
   const [provider, setProvider] = useState("fixture");
   const [fallback, setFallback] = useState(false);
   const [maxPages, setMaxPages] = useState(20);
+  const [temporaryDemo, setTemporaryDemo] = useState(false);
   const [ready, setReady] = useState(false);
   const load = useCallback(async () => {
     if (!token) return;
@@ -43,12 +44,14 @@ export default function App() {
           provider: string;
           local_fallback_enabled: boolean;
           max_pages: number;
+          temporary_demo?: boolean;
         }>("/config", token),
       ]);
       setJobs(items);
       setProvider(config.provider);
       setFallback(config.local_fallback_enabled);
       setMaxPages(config.max_pages);
+      setTemporaryDemo(Boolean(config.temporary_demo));
       setReady(true);
     } catch (error) {
       setError((error as Error).message);
@@ -113,9 +116,7 @@ export default function App() {
             <ArrowRight size={16} />
           </button>
           <small>
-            Local demo token: <code>local-demo-only</code>
-            <br />
-            Use your configured token for a shared installation.
+            Ask the workspace owner for an access token. Keep it private.
           </small>
         </form>
       </div>
@@ -221,6 +222,14 @@ export default function App() {
               <strong>Public sample preview</strong>
               <span>
                 Synthetic invoices only · No live AI or server storage · Review decisions reset on refresh
+              </span>
+            </div>
+          )}
+          {temporaryDemo && !PUBLIC_PREVIEW && (
+            <div className="preview-banner" role="status">
+              <strong>Temporary live demo</strong>
+              <span>
+                Real extraction and review · Source documents expire after seven days · Demo database expires after 30 days
               </span>
             </div>
           )}

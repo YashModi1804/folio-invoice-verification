@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, create_engine
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, LargeBinary, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 from app.config import settings
@@ -45,6 +45,12 @@ class Job(Base):
     review_decision: Mapped["ReviewDecision | None"] = relationship(
         lazy="selectin", viewonly=True, uselist=False
     )
+
+
+class DocumentSource(Base):
+    __tablename__ = "document_sources"
+    job_id: Mapped[str] = mapped_column(ForeignKey("processing_jobs.id"), primary_key=True)
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
 
 class AuditEvent(Base):

@@ -186,6 +186,11 @@ GitHub Pages cannot run the FastAPI API, database, or worker. Do not put an oper
 token or provider key in the Pages build. To deploy live extraction, use a separate
 backend host with private credentials and persistent document/database storage.
 
+The [Render live-demo deployment guide](docs/RENDER.md) records the temporary
+full-stack setup and its 30-day data limit. It uses private PostgreSQL source
+storage and an embedded worker because free Render web services have no persistent
+filesystem or free background-worker plan.
+
 To rebuild the public assets locally, run `.venv/bin/python -m scripts.export_public_preview`
 then `FOLIO_PUBLIC_PREVIEW=1 VITE_FOLIO_PUBLIC_PREVIEW=true pnpm --dir web build`.
 The Pages workflow performs both steps on `main` and publishes only `web/dist`.
@@ -208,7 +213,8 @@ Source retention defaults to seven days. Preview expiration without deleting any
 
 `--apply` permanently deletes expired source files and records an audit event. It does
 not delete extraction/review records; define a separate client data-erasure policy.
-Schedule that command in your deployment if automatic expiration is required.
+The long-running worker checks for expired sources hourly; the command remains
+available for a manual dry run or immediate cleanup.
 
 ## Sales handoff
 

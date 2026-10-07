@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     database_url: str = "sqlite:///data/folio.db"
     storage_dir: Path = Path("data/documents")
+    source_storage: Literal["file", "database"] = "file"
+    embedded_worker: bool = False
+    public_demo: bool = False
     operator_token: SecretStr = SecretStr("local-demo-only")
     operator_name: str = "Demo operator"
     provider: Literal["fixture", "gemini", "groq", "ollama"] = "fixture"
@@ -29,6 +32,15 @@ class Settings(BaseSettings):
     retention_days: int = 7
     confidence_threshold: float = 0.85
     provider_timeout_seconds: int = 90
+
+    @field_validator("database_url")
+    @classmethod
+    def use_psycopg_driver(cls, value: str) -> str:
+        if value.startswith("postgres://"):
+            return value.replace("postgres://", "postgresql+psycopg://", 1)
+        if value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+psycopg://", 1)
+        return value
 
 
 settings = Settings()

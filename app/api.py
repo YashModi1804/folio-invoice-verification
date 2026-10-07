@@ -14,7 +14,7 @@ from starlette.concurrency import run_in_threadpool
 from app.config import settings
 from app.db import AuditEvent, Job, Session, timestamp
 from app.samples import SAMPLES, sample_pdf
-from app.storage import DocumentError, document_path, inspect, render
+from app.storage import DocumentError, document_path, inspect, read_source, render, save_source
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -82,9 +82,6 @@ def enqueue(data: bytes, filename: str, key: str, sample: str | None = None):
     except DocumentError as exc:
         raise HTTPException(422, str(exc)) from exc
     job_id = str(uuid4())
-    path = document_path(job_id)
-    path.write_bytes(data)
-    path.chmod(0o600)
     try:
         with Session.begin() as db:
             job = Job(
@@ -99,6 +96,7 @@ def enqueue(data: bytes, filename: str, key: str, sample: str | None = None):
             )
             db.add(job)
             db.flush()
+            save_source(db, job_id, data)
             db.add(
                 AuditEvent(
                     job_id=job.id,
@@ -117,14 +115,16 @@ def enqueue(data: bytes, filename: str, key: str, sample: str | None = None):
             result = serialize(job)
         return result
     except IntegrityError:
-        path.unlink(missing_ok=True)
+        if settings.source_storage == "file":
+            document_path(job_id).unlink(missing_ok=True)
         with Session() as db:
             existing = db.scalar(select(Job).where(Job.idempotency_key == key))
             if existing and existing.checksum == checksum and existing.sample == sample:
                 return serialize(existing)
         raise HTTPException(409, "Conflicting concurrent upload") from None
     except Exception:
-        path.unlink(missing_ok=True)
+        if settings.source_storage == "file":
+            document_path(job_id).unlink(missing_ok=True)
         raise
 
 
@@ -135,6 +135,7 @@ def configuration():
         "local_fallback_enabled": settings.local_fallback_enabled,
         "max_file_mb": settings.max_file_bytes // 1024**2,
         "max_pages": settings.max_pages,
+        "temporary_demo": settings.public_demo,
         "samples": [
             {"id": key, "name": value[0], "description": value[1]} for key, value in SAMPLES.items()
         ],
@@ -179,10 +180,8 @@ def page_image(job_id: str, page_number: int):
         job = get_job(db, job_id)
         if not 1 <= page_number <= job.page_count:
             raise HTTPException(404, "Page not found")
-        path = document_path(job.id)
-        if not path.exists():
+        source = read_source(db, job.id)
+        if source is None:
             raise HTTPException(410, "Source document retention period ended")
-        pages = render(path.read_bytes(), job.media_type)
-        return Response(
-            pages[page_number - 1], media_type="image/png", headers={"Cache-Control": "no-store"}
-        )
+        pages = render(source, job.media_type, page_numbers=(page_number,))
+        return Response(pages[0], media_type="image/png", headers={"Cache-Control": "no-store"})

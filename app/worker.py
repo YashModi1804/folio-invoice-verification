@@ -17,7 +17,7 @@ from app.groq import GROQ_PROMPT_VERSION, VISION_PAGE_LIMITS, GroqProvider
 from app.logging import configure_logging
 from app.ollama import LOCAL_PROMPT_VERSION, OllamaProvider
 from app.providers import FixtureProvider, ProviderError
-from app.storage import DocumentError, document_path, page_texts, render
+from app.storage import DocumentError, page_texts, read_source, render
 
 logger = logging.getLogger("folio.worker")
 WORKER_ID = new_id()
@@ -188,7 +188,9 @@ def run_once() -> bool:
     try:
         with Session() as db:
             job = db.get(Job, job_id)
-            document = document_path(job_id).read_bytes()
+            document = read_source(db, job_id)
+            if document is None:
+                raise DocumentError("SOURCE_DOCUMENT_MISSING")
             plan = None
             page_plan_details = None
             planning_start = time.monotonic()
@@ -301,7 +303,18 @@ def run_once() -> bool:
 
 def main():
     configure_logging()
+    last_retention = 0.0
     while True:
+        if time.monotonic() - last_retention > 3600:
+            from app.retention import expire_sources
+
+            try:
+                expired = expire_sources(apply=True)
+                if expired:
+                    logger.info("expired_source_documents", extra={"count": len(expired)})
+            except Exception:
+                logger.exception("source_retention_failed")
+            last_retention = time.monotonic()
         if not run_once():
             time.sleep(0.75)
 

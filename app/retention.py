@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.db import AuditEvent, Job, Session, now
-from app.storage import document_path
+from app.storage import delete_source, source_exists
 
 
 def expire_sources(apply: bool = False) -> list[str]:
@@ -18,12 +18,11 @@ def expire_sources(apply: bool = False) -> list[str]:
             select(Job).where(Job.created_at < cutoff, Job.status.notin_(["QUEUED", "PROCESSING"]))
         )
         for job in jobs:
-            path = document_path(job.id)
-            if not path.exists():
+            if not source_exists(db, job.id):
                 continue
             expired.append(job.id)
             if apply:
-                path.unlink()
+                delete_source(db, job.id)
                 db.add(
                     AuditEvent(
                         job_id=job.id,

@@ -17,4 +17,4 @@ COPY --from=frontend /build/dist web/dist/
 RUN useradd --create-home folio && mkdir -p data/documents && chown -R folio:folio /app
 USER folio
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

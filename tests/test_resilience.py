@@ -5,7 +5,8 @@ import pytest
 from sqlalchemy import select
 
 from app import api, retention, worker
-from app.db import Job, now
+from app.config import settings
+from app.db import DocumentSource, Job, now
 from app.domain.routing import route
 from app.domain.verify import verify
 from app.samples import sample_invoice, sample_pdf
@@ -65,6 +66,23 @@ def test_retention_dry_run_then_source_expiration(client):
     retention.expire_sources(apply=True)
     assert not document_path(job_id).exists()
     assert client.get(f"/api/v1/jobs/{job_id}").json()["result"] is not None
+    assert client.get(f"/api/v1/jobs/{job_id}/pages/1").status_code == 410
+
+
+def test_database_source_survives_processing_and_expires(client, monkeypatch):
+    monkeypatch.setattr(settings, "source_storage", "database")
+    job_id = client.post("/api/v1/samples/clean").json()["job_id"]
+    assert not document_path(job_id).exists()
+    with api.Session() as db:
+        assert db.get(DocumentSource, job_id).content.startswith(b"%PDF-")
+    assert worker.run_once()
+    assert client.get(f"/api/v1/jobs/{job_id}/pages/1").status_code == 200
+    with api.Session.begin() as db:
+        db.get(Job, job_id).created_at = now() - timedelta(days=10)
+    assert retention.expire_sources() == [job_id]
+    retention.expire_sources(apply=True)
+    with api.Session() as db:
+        assert db.get(DocumentSource, job_id) is None
     assert client.get(f"/api/v1/jobs/{job_id}/pages/1").status_code == 410
 
 

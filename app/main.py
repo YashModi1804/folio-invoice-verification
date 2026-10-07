@@ -1,5 +1,7 @@
 import os
+import threading
 import time
+from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
@@ -16,7 +18,27 @@ from app.api import router
 from app.config import settings
 from app.db import Job, Session, WorkerHeartbeat, engine, now
 
-app = FastAPI(title="Folio · Document verification", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_app):
+    if settings.public_demo:
+        token = settings.operator_token.get_secret_value()
+        if token == "local-demo-only" or len(token) < 32:
+            raise RuntimeError(
+                "Public demo requires a unique operator token of at least 32 characters"
+            )
+        if settings.provider == "groq" and not settings.groq_api_key.get_secret_value():
+            raise RuntimeError("Public Groq demo requires GROQ_API_KEY")
+        if settings.provider == "gemini" and not settings.gemini_api_key.get_secret_value():
+            raise RuntimeError("Public Gemini demo requires GEMINI_API_KEY")
+    if settings.embedded_worker:
+        from app.worker import main as run_worker
+
+        threading.Thread(target=run_worker, daemon=True, name="folio-worker").start()
+    yield
+
+
+app = FastAPI(title="Folio · Document verification", version="0.1.0", lifespan=lifespan)
 
 
 @app.middleware("http")
@@ -78,7 +100,9 @@ def readiness():
                 .where(WorkerHeartbeat.last_seen > now() - timedelta(minutes=3))
                 .limit(1)
             )
-        storage_ok = settings.storage_dir.is_dir() and os.access(settings.storage_dir, os.W_OK)
+        storage_ok = settings.source_storage == "database" or (
+            settings.storage_dir.is_dir() and os.access(settings.storage_dir, os.W_OK)
+        )
         body = {
             "database": "ready",
             "worker": "ready" if heartbeat else "unavailable",

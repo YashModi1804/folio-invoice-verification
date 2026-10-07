@@ -3,8 +3,10 @@ from pathlib import Path
 
 import pymupdf
 from PIL import Image, UnidentifiedImageError
+from sqlalchemy import select
 
 from app.config import settings
+from app.db import DocumentSource
 
 Image.MAX_IMAGE_PIXELS = 25_000_000
 EXTENSIONS = {
@@ -62,6 +64,46 @@ def inspect(data: bytes, filename: str) -> tuple[str, int]:
 
 def document_path(job_id: str) -> Path:
     return settings.storage_dir / f"{job_id}.bin"
+
+
+def save_source(db, job_id: str, data: bytes) -> None:
+    if settings.source_storage == "database":
+        db.add(DocumentSource(job_id=job_id, content=data))
+        return
+    path = document_path(job_id)
+    path.write_bytes(data)
+    path.chmod(0o600)
+
+
+def read_source(db, job_id: str) -> bytes | None:
+    if settings.source_storage == "database":
+        source = db.get(DocumentSource, job_id)
+        return source.content if source else None
+    path = document_path(job_id)
+    return path.read_bytes() if path.exists() else None
+
+
+def source_exists(db, job_id: str) -> bool:
+    if settings.source_storage == "database":
+        return (
+            db.scalar(select(DocumentSource.job_id).where(DocumentSource.job_id == job_id))
+            is not None
+        )
+    return document_path(job_id).exists()
+
+
+def delete_source(db, job_id: str) -> bool:
+    if settings.source_storage == "database":
+        source = db.get(DocumentSource, job_id)
+        if source is None:
+            return False
+        db.delete(source)
+        return True
+    path = document_path(job_id)
+    if not path.exists():
+        return False
+    path.unlink()
+    return True
 
 
 def render(
