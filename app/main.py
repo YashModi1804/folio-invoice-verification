@@ -48,17 +48,28 @@ async def request_context(request: Request, call_next):
     # Bound multipart requests before the framework buffers them on disk.
     length = request.headers.get("content-length")
     if request.method == "POST" and request.url.path == "/api/v1/documents" and not length:
-        return JSONResponse(
+        response = JSONResponse(
             {"detail": "Content-Length required", "correlation_id": correlation_id}, status_code=411
         )
-    if length and (not length.isdigit() or int(length) > settings.max_file_bytes + 65536):
-        return JSONResponse(
+    elif length and (not length.isdigit() or int(length) > settings.max_file_bytes + 65536):
+        response = JSONResponse(
             {"detail": "FILE_SIZE_LIMIT", "correlation_id": correlation_id}, status_code=413
         )
-    response = await call_next(request)
+    else:
+        response = await call_next(request)
     response.headers["X-Correlation-ID"] = correlation_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000"
+    if not request.url.path.startswith(("/docs", "/redoc", "/openapi.json")):
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; "
+            "script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; form-action 'self'"
+        )
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
     return response
