@@ -31,6 +31,18 @@ Oregon, matching the database. The following environment variables are required:
 | `LOCAL_FALLBACK_ENABLED` | `false` (Ollama is not hosted on the free service) |
 | `MAX_FILE_BYTES` | `10485760` (10 MB) |
 
+`GUEST_ENABLED=true` is an optional, separately approved public-trial switch.
+It auto-creates private guest workspaces and leaves the operator token
+private. Before enabling it, deploy the guest-workspace migration, confirm the
+sample-only guest flow, and test two browsers for cross-workspace isolation.
+The default guest caps are two live uploads per guest per rolling day, 20 site-wide per rolling day,
+ten pending guest jobs, 5 MB and three pages per file. Increase only after
+checking Groq's actual organization limits. Guests see four labeled synthetic
+samples without inference, including HelixPoint. Guest access has no application expiry.
+Each guest upload and its history become inaccessible after two hours; physical cleanup
+runs while the service is awake. The free database still has its own expiry.
+Do not claim deletion at the exact minute or across third-party systems.
+
 Never add secrets to Git, `render.yaml`, screenshots, or Loom footage. The web
 service refuses startup with the default local token or a missing live-provider key.
 Use Render's internal database URL, and block public inbound database traffic.

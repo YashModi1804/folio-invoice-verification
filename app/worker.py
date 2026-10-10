@@ -17,6 +17,7 @@ from app.groq import GROQ_PROMPT_VERSION, VISION_PAGE_LIMITS, GroqProvider
 from app.logging import configure_logging
 from app.ollama import LOCAL_PROMPT_VERSION, OllamaProvider
 from app.providers import FixtureProvider, ProviderError
+from app.samples import sample_pdf
 from app.storage import DocumentError, page_texts, read_source, render
 
 logger = logging.getLogger("folio.worker")
@@ -170,6 +171,12 @@ def run_once() -> bool:
             .where(
                 Job.status == "QUEUED",
                 or_(Job.not_before.is_(None), Job.not_before <= now()),
+                or_(
+                    Job.workspace_id == "operator",
+                    Job.sample.is_not(None),
+                    Job.created_at
+                    > now() - timedelta(minutes=settings.guest_upload_retention_minutes),
+                ),
             )
             .order_by(Job.created_at)
             .limit(1)
@@ -189,6 +196,8 @@ def run_once() -> bool:
         with Session() as db:
             job = db.get(Job, job_id)
             document = read_source(db, job_id)
+            if document is None and job.workspace_id != "operator" and job.sample:
+                document = sample_pdf(job.sample)
             if document is None:
                 raise DocumentError("SOURCE_DOCUMENT_MISSING")
             plan = None
@@ -303,18 +312,24 @@ def run_once() -> bool:
 
 def main():
     configure_logging()
-    last_retention = 0.0
+    last_guest_cleanup = 0.0
+    last_source_cleanup = 0.0
     while True:
-        if time.monotonic() - last_retention > 3600:
-            from app.retention import expire_sources
+        if time.monotonic() - last_guest_cleanup > 60:
+            from app.retention import expire_guest_uploads, expire_sources
 
             try:
-                expired = expire_sources(apply=True)
-                if expired:
-                    logger.info("expired_source_documents", extra={"count": len(expired)})
+                uploads = expire_guest_uploads()
+                if uploads:
+                    logger.info("expired_guest_uploads", extra={"count": uploads})
+                if time.monotonic() - last_source_cleanup > 3600:
+                    expired = expire_sources(apply=True)
+                    if expired:
+                        logger.info("expired_source_documents", extra={"count": len(expired)})
+                    last_source_cleanup = time.monotonic()
             except Exception:
                 logger.exception("source_retention_failed")
-            last_retention = time.monotonic()
+            last_guest_cleanup = time.monotonic()
         if not run_once():
             time.sleep(0.75)
 

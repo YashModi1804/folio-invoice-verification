@@ -31,6 +31,20 @@ The product must make one promise visible: **the model may extract data, but it 
 - Training or fine-tuning models.
 - Guaranteed legal/tax compliance or “zero hallucination” claims.
 
+### Public demo extension
+
+An optional public demo may issue an anonymous guest credential
+without signup. Each browser retains its credential locally. Each guest receives a separate workspace with private uploads,
+results, source pages, reviews, exports and metrics. Existing operator records
+remain in the operator workspace. Synthetic fixture examples may be seeded into
+each guest workspace but must stay visibly labeled and make no provider call.
+Guest access and labeled synthetic samples do not expire by application policy.
+Each guest upload, result and review history becomes inaccessible after two hours;
+cleanup runs when the service is awake, so the UI must not promise physical deletion
+at an exact minute. Guest live uploads have per-guest and site-wide daily caps.
+This is a demo access model, not client authentication, SSO, or a data-retention
+guarantee for third-party providers or the time-limited free database.
+
 ## 2. Corrections Applied to the Original Draft
 
 | Original point | Correction in this SRS | Why it matters |

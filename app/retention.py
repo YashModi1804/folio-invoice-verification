@@ -1,12 +1,12 @@
-"""Delete expired source files only. Dry-run by default; records and audit remain."""
+"""Apply source retention and remove temporary guest uploads."""
 
 import argparse
 from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.config import settings
-from app.db import AuditEvent, Job, Session, now
+from app.db import AuditEvent, GuestUploadUsage, Job, ReviewDecision, Session, now
 from app.storage import delete_source, source_exists
 
 
@@ -32,6 +32,32 @@ def expire_sources(apply: bool = False) -> list[str]:
                     )
                 )
     return expired
+
+
+def expire_guest_uploads() -> int:
+    """Remove guest uploads and their private history after access has ended."""
+    removed = 0
+    cutoff = now() - timedelta(minutes=settings.guest_upload_retention_minutes)
+    with Session.begin() as db:
+        jobs = db.scalars(
+            select(Job).where(
+                Job.workspace_id != "operator",
+                Job.sample.is_(None),
+                Job.created_at <= cutoff,
+            )
+        ).all()
+        for job in jobs:
+            if job.status == "PROCESSING":
+                continue
+            delete_source(db, job.id)
+            db.execute(delete(AuditEvent).where(AuditEvent.job_id == job.id))
+            db.execute(delete(ReviewDecision).where(ReviewDecision.job_id == job.id))
+            db.delete(job)
+            removed += 1
+        db.execute(
+            delete(GuestUploadUsage).where(GuestUploadUsage.created_at < now() - timedelta(days=1))
+        )
+    return removed
 
 
 if __name__ == "__main__":

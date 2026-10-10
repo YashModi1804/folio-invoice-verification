@@ -1,9 +1,9 @@
 """Stable, vendor-neutral exports for ERP and accounting-system connectors."""
 
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException
 from sqlalchemy import select
 
-from app.api import authenticate, get_job, router
+from app.api import CurrentAccess, get_job, router
 from app.db import AuditEvent, ReviewDecision, Session, timestamp
 from app.domain.models import ERPExportAcknowledgement
 
@@ -54,9 +54,9 @@ def approved_export(job, decision: ReviewDecision | None) -> dict:
 
 
 @router.get("/jobs/{job_id}/erp-export")
-def erp_export(job_id: str):
+def erp_export(job_id: str, access: CurrentAccess):
     with Session() as db:
-        job = get_job(db, job_id)
+        job = get_job(db, job_id, access)
         decision = db.scalar(select(ReviewDecision).where(ReviewDecision.job_id == job_id))
         return approved_export(job, decision)
 
@@ -65,10 +65,10 @@ def erp_export(job_id: str):
 def acknowledge_erp_export(
     job_id: str,
     acknowledgement: ERPExportAcknowledgement,
-    actor: str = Depends(authenticate),
+    access: CurrentAccess,
 ):
     with Session.begin() as db:
-        job = get_job(db, job_id)
+        job = get_job(db, job_id, access)
         decision = db.scalar(select(ReviewDecision).where(ReviewDecision.job_id == job_id))
         export = approved_export(job, decision)
         acknowledgements = list(
@@ -85,7 +85,7 @@ def acknowledge_erp_export(
                 AuditEvent(
                     job_id=job_id,
                     event="ERP_EXPORT_ACKNOWLEDGED",
-                    actor=actor,
+                    actor=access.actor,
                     details=details,
                 )
             )

@@ -27,6 +27,9 @@ class Base(DeclarativeBase):
 class Job(Base):
     __tablename__ = "processing_jobs"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), default="operator", server_default="operator", index=True
+    )
     correlation_id: Mapped[str] = mapped_column(String(36), default=new_id)
     idempotency_key: Mapped[str] = mapped_column(String(128), unique=True)
     checksum: Mapped[str] = mapped_column(String(64))
@@ -45,6 +48,20 @@ class Job(Base):
     review_decision: Mapped["ReviewDecision | None"] = relationship(
         lazy="selectin", viewonly=True, uselist=False
     )
+
+
+class GuestSession(Base):
+    __tablename__ = "guest_sessions"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class GuestUploadUsage(Base):
+    __tablename__ = "guest_upload_usage"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    guest_id: Mapped[str] = mapped_column(ForeignKey("guest_sessions.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, index=True)
 
 
 class DocumentSource(Base):

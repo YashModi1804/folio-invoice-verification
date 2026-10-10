@@ -140,11 +140,14 @@ simplifies the SRS's more normalized reference design for a small demo.
 
 Interactive documentation: **http://127.0.0.1:8000/docs**. Use its **Authorize** button
 with the operator token. All `/api/v1` routes and source images require authentication.
+The optional guest-session creation route is public; every document and review route
+still requires a valid operator or guest credential and checks workspace ownership.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | POST | `/api/v1/documents` | Multipart upload; requires `Idempotency-Key` header |
-| POST | `/api/v1/samples/{clean\|variance\|uncertain}` | Explicit synthetic fixture |
+| POST | `/api/v1/samples/{clean\|variance\|uncertain\|helixpoint}` | Explicit synthetic fixture |
+| POST | `/api/v1/guest-sessions` | Create a private guest workspace when enabled |
 | GET | `/api/v1/jobs` | Latest 100 records and effective reviewed summaries |
 | GET | `/api/v1/jobs/{id}` | Original extraction, checks, usage, and status |
 | GET | `/api/v1/jobs/{id}/pages/{page}` | Authenticated source-page preview |
@@ -178,7 +181,7 @@ errors, interrupted jobs, source retention, and redacted API errors.
 ## Deployment foundation
 
 The [GitHub Pages preview](https://yashmodi1804.github.io/folio-invoice-verification/)
-is a public, sample-only walkthrough. It uses three synthetic invoices exported by
+is a public, sample-only walkthrough. It uses four synthetic invoices exported by
 `scripts/export_public_preview.py` from the same Python verifier and routing policy.
 It makes no AI calls, accepts no private uploads, and keeps trial review decisions
 only in the current browser tab. Its source pages and result JSON are public assets.
@@ -191,6 +194,20 @@ full-stack setup and its 30-day data limit. It uses private PostgreSQL source
 storage and an embedded worker because free Render web services have no persistent
 filesystem or free background-worker plan.
 
+Set `GUEST_ENABLED=true` only when public trials are intended. A guest link creates
+a persistent browser credential and preloads four labeled fixtures, including the
+18-line HelixPoint invoice. The operator workspace and historical records stay
+separate. Guest uploads are limited to two per guest and 20 across the site in a
+rolling day, three pages and 5 MB per file, with at most ten guest jobs pending.
+Guest access and samples have no application expiry. Each personal upload, its result,
+review decisions and audit events become inaccessible after two hours and are deleted
+when the embedded worker runs cleanup; free-service sleep means physical deletion is
+not guaranteed at the exact expiry minute. Clearing browser storage loses the anonymous
+credential. The free Render database itself has a fixed expiry, so it cannot promise
+permanent storage for any workspace.
+These bounds are a demo safeguard, not a promise of provider availability or
+production-grade account security.
+
 To rebuild the public assets locally, run `.venv/bin/python -m scripts.export_public_preview`
 then `FOLIO_PUBLIC_PREVIEW=1 VITE_FOLIO_PUBLIC_PREVIEW=true pnpm --dir web build`.
 The Pages workflow performs both steps on `main` and publishes only `web/dist`.
@@ -202,7 +219,7 @@ not available on the development machine, so this path is supplied but not execu
 
 For a client deployment, add the client's identity/tenant isolation, managed storage,
 TLS, rate limiting, monitoring, backups, and provider data-processing agreement.
-The demo token is public and unsuitable for a shared environment. PDFs render in the
+The local demo token is public and unsuitable for a shared environment. PDFs render in the
 worker process; hostile public intake needs stronger process/resource isolation.
 
 Source retention defaults to seven days. Preview expiration without deleting anything:

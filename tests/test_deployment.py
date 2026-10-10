@@ -21,3 +21,11 @@ def test_public_demo_rejects_local_token(monkeypatch):
     with pytest.raises(RuntimeError, match="unique operator token"):
         with TestClient(app):
             pass
+
+
+def test_guest_mode_rejects_local_token(monkeypatch):
+    monkeypatch.setattr(settings, "guest_enabled", True)
+    monkeypatch.setattr(settings, "embedded_worker", False)
+    with pytest.raises(RuntimeError, match="unique operator token"):
+        with TestClient(app):
+            pass

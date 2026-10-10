@@ -7,7 +7,7 @@ export async function request<T>(
 ): Promise<T> {
   if (PUBLIC_PREVIEW) return previewRequest<T>(path, options);
   const headers = new Headers(options.headers);
-  headers.set("Authorization", `Bearer ${token}`);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
   if (options.body && !(options.body instanceof FormData))
     headers.set("Content-Type", "application/json");
   const response = await fetch(`/api/v1${path}`, { ...options, headers });

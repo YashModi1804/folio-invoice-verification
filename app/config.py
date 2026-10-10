@@ -12,6 +12,13 @@ class Settings(BaseSettings):
     source_storage: Literal["file", "database"] = "file"
     embedded_worker: bool = False
     public_demo: bool = False
+    guest_enabled: bool = False
+    guest_upload_retention_minutes: int = 120
+    guest_uploads_per_guest_day: int = 2
+    guest_uploads_per_day: int = 20
+    guest_queue_limit: int = 10
+    guest_max_file_bytes: int = 5 * 1024 * 1024
+    guest_max_pages: int = 3
     operator_token: SecretStr = SecretStr("local-demo-only")
     operator_name: str = "Demo operator"
     provider: Literal["fixture", "gemini", "groq", "ollama"] = "fixture"

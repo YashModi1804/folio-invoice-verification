@@ -22,9 +22,14 @@ import { PUBLIC_PREVIEW } from "./preview";
 
 export default function App() {
   const [token, setToken] = useState(
-    PUBLIC_PREVIEW ? "public-preview" : sessionStorage.getItem("folio-token") ?? "",
+    PUBLIC_PREVIEW ? "public-preview" : sessionStorage.getItem("folio-token") ?? localStorage.getItem("folio-guest-token") ?? "",
   );
   const [tokenInput, setTokenInput] = useState("");
+  const [workspace, setWorkspace] = useState<"operator" | "guest">(
+    !PUBLIC_PREVIEW && !sessionStorage.getItem("folio-token") && localStorage.getItem("folio-guest-token") ? "guest" : "operator",
+  );
+  const [operatorLogin, setOperatorLogin] = useState(false);
+  const [guestStarting, setGuestStarting] = useState(!PUBLIC_PREVIEW && !token);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState<"all" | "review">("all");
@@ -33,8 +38,27 @@ export default function App() {
   const [provider, setProvider] = useState("fixture");
   const [fallback, setFallback] = useState(false);
   const [maxPages, setMaxPages] = useState(20);
+  const [maxFileMb, setMaxFileMb] = useState(20);
   const [temporaryDemo, setTemporaryDemo] = useState(false);
   const [ready, setReady] = useState(false);
+  const startGuest = useCallback(async () => {
+    setGuestStarting(true);
+    try {
+      const session = await request<{ token: string }>("/guest-sessions", "", { method: "POST" });
+      localStorage.setItem("folio-guest-token", session.token);
+      setWorkspace("guest");
+      setToken(session.token);
+      setOperatorLogin(false);
+      setError("");
+    } catch {
+      setOperatorLogin(true);
+    } finally {
+      setGuestStarting(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (!PUBLIC_PREVIEW && !token && !operatorLogin) void startGuest();
+  }, [token, operatorLogin, startGuest]);
   const load = useCallback(async () => {
     if (!token) return;
     try {
@@ -44,30 +68,46 @@ export default function App() {
           provider: string;
           local_fallback_enabled: boolean;
           max_pages: number;
+          max_file_mb: number;
+          workspace?: "operator" | "guest";
           temporary_demo?: boolean;
         }>("/config", token),
       ]);
       setJobs(items);
       setProvider(config.provider);
+      setWorkspace(config.workspace ?? "operator");
       setFallback(config.local_fallback_enabled);
       setMaxPages(config.max_pages);
+      setMaxFileMb(config.max_file_mb ?? 20);
       setTemporaryDemo(Boolean(config.temporary_demo));
       setReady(true);
     } catch (error) {
-      setError((error as Error).message);
+      if (workspace === "guest" && (error as Error).message === "Authentication required") {
+        localStorage.removeItem("folio-guest-token");
+        setToken("");
+        setJobs([]);
+        setSelected(null);
+        setReady(false);
+      } else {
+        setError((error as Error).message);
+      }
     }
-  }, [token]);
+  }, [token, workspace]);
   useEffect(() => {
     void load();
-    const timer = setInterval(() => void load(), 1500);
-    return () => clearInterval(timer);
   }, [load]);
+  const hasPendingJob = jobs.some((job) => ["QUEUED", "PROCESSING"].includes(job.status));
+  useEffect(() => {
+    const timer = setInterval(() => void load(), hasPendingJob ? 1500 : 15000);
+    return () => clearInterval(timer);
+  }, [load, hasPendingJob]);
   async function login(event: React.FormEvent) {
     event.preventDefault();
     setError("");
     try {
       await request("/config", tokenInput);
       sessionStorage.setItem("folio-token", tokenInput);
+      setWorkspace("operator");
       setToken(tokenInput);
     } catch (error) {
       setError((error as Error).message);
@@ -87,6 +127,8 @@ export default function App() {
         .includes(query.toLowerCase()),
   );
   const current = jobs.find((j) => j.job_id === selected);
+  if (guestStarting && !token)
+    return <div className="login"><div className="eyebrow">Folio / Document verification</div><p>Opening your private demo workspace…</p></div>;
   if (!token)
     return (
       <div className="login">
@@ -115,6 +157,9 @@ export default function App() {
             Open workspace
             <ArrowRight size={16} />
           </button>
+          <button className="ghost" type="button" onClick={() => void startGuest()}>
+            Explore as guest
+          </button>
           <small>
             Ask the workspace owner for an access token. Keep it private.
           </small>
@@ -138,7 +183,9 @@ export default function App() {
             /{" "}
           </span>
         </div>
-        <div className="workspace-label">OPERATIONS WORKSPACE</div>
+        <div className="workspace-label">
+          {workspace === "guest" ? "PRIVATE DEMO WORKSPACE" : "OPERATIONS WORKSPACE"}
+        </div>
         <nav className="nav">
           <button
             className={view === "all" ? "active" : ""}
@@ -192,19 +239,22 @@ export default function App() {
           <div className="operator">
             <span className="mode-pill">
               <span className="dot" />
-              {provider === "fixture"
-                ? "SAMPLE WORKSPACE"
+              {workspace === "guest"
+                ? "PRIVATE GUEST DEMO"
+                : provider === "fixture"
+                  ? "SAMPLE WORKSPACE"
                 : provider === "ollama"
                   ? "LOCAL AI WORKSPACE"
                   : "LIVE WORKSPACE"}
             </span>
-            <span className="avatar">OP</span>
+            <span className="avatar">{workspace === "guest" ? "GU" : "OP"}</span>
             {!PUBLIC_PREVIEW && (
               <button
                 className="ghost"
-                aria-label="Sign out"
+                aria-label={workspace === "guest" ? "Operator access" : "Sign out"}
                 onClick={() => {
                   sessionStorage.removeItem("folio-token");
+                  setOperatorLogin(true);
                   setToken("");
                   setReady(false);
                   setSelected(null);
@@ -212,6 +262,7 @@ export default function App() {
                 }}
               >
                 <LogOut size={15} />
+                {workspace === "guest" && "Operator access"}
               </button>
             )}
           </div>
@@ -225,11 +276,13 @@ export default function App() {
               </span>
             </div>
           )}
-          {temporaryDemo && !PUBLIC_PREVIEW && (
+          {(temporaryDemo || workspace === "guest") && !PUBLIC_PREVIEW && (
             <div className="preview-banner" role="status">
-              <strong>Temporary live demo</strong>
+              <strong>{workspace === "guest" ? "Private guest demo" : "Temporary live demo"}</strong>
               <span>
-                Real extraction and review · Source documents expire after seven days · Demo database expires after 30 days
+                {workspace === "guest"
+                  ? "Shared synthetic samples stay available · Private uploads and reviews auto-delete after two hours when the service is awake"
+                  : "Real extraction and review · Source documents expire after seven days · Demo database expires after 30 days"}
               </span>
             </div>
           )}
@@ -329,6 +382,7 @@ export default function App() {
                     provider={provider}
                     fallback={fallback}
                     maxPages={maxPages}
+                    maxFileMb={maxFileMb}
                     onError={setError}
                     onCreated={(job) => {
                       setJobs((items) => [job, ...items]);

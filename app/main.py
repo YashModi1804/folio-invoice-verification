@@ -14,14 +14,14 @@ from sqlalchemy import select, text
 from starlette.exceptions import HTTPException
 
 from app import integrations, review  # noqa: F401 — registers integration and review routes
-from app.api import router
+from app.api import CurrentAccess, guest_router, router, visible_jobs
 from app.config import settings
 from app.db import Job, Session, WorkerHeartbeat, engine, now
 
 
 @asynccontextmanager
 async def lifespan(_app):
-    if settings.public_demo:
+    if settings.public_demo or settings.guest_enabled:
         token = settings.operator_token.get_secret_value()
         if token == "local-demo-only" or len(token) < 32:
             raise RuntimeError(
@@ -125,9 +125,9 @@ def readiness():
 
 
 @router.get("/metrics")
-def metrics():
+def metrics(access: CurrentAccess):
     with Session() as db:
-        jobs = db.scalars(select(Job)).all()
+        jobs = db.scalars(select(Job).where(*visible_jobs(access))).all()
         counts = {}
         for job in jobs:
             counts[job.status] = counts.get(job.status, 0) + 1
@@ -153,6 +153,7 @@ def metrics():
 
 
 # Router must be included after all decorators have registered.
+app.include_router(guest_router)
 app.include_router(router)
 frontend = Path("web/dist")
 if frontend.exists():

@@ -551,5 +551,414 @@
         }
       }
     }
+  },
+  {
+    "kind": "helixpoint",
+    "job": {
+      "job_id": "preview-helixpoint",
+      "correlation_id": "synthetic-helixpoint",
+      "filename": "helixpoint-enterprise.pdf",
+      "status": "REQUIRES_HUMAN_REVIEW",
+      "page_count": 2,
+      "mode": "fixture",
+      "requested_provider": "fixture",
+      "created_at": "",
+      "not_before": null,
+      "error": null,
+      "summary": {
+        "vendor_name": "HELIXPOINT",
+        "invoice_number": "HPI-2026-1048",
+        "total_amount": "60283.67",
+        "currency": "USD"
+      },
+      "result": {
+        "invoice": {
+          "vendor_name": {
+            "value": "HELIXPOINT",
+            "confidence": 0.95,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "HELIXPOINT"
+              }
+            ]
+          },
+          "vendor_tax_id": {
+            "value": null,
+            "confidence": 0.0,
+            "evidence": []
+          },
+          "invoice_number": {
+            "value": "HPI-2026-1048",
+            "confidence": 0.95,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "HPI-2026-1048"
+              }
+            ]
+          },
+          "invoice_date": {
+            "value": "2026-10-02",
+            "confidence": 0.95,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "2026-10-02"
+              }
+            ]
+          },
+          "currency": {
+            "value": "USD",
+            "confidence": 0.95,
+            "evidence": [
+              {
+                "page_number": 1,
+                "text": "USD"
+              }
+            ]
+          },
+          "subtotal": {
+            "value": "57754.50",
+            "confidence": 0.95,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "57754.50"
+              }
+            ]
+          },
+          "tax_amount": {
+            "value": "2484.17",
+            "confidence": 0.95,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "2484.17"
+              }
+            ]
+          },
+          "shipping_amount": {
+            "value": "420.00",
+            "confidence": 0.95,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "420.00"
+              }
+            ]
+          },
+          "discount_amount": {
+            "value": "500.00",
+            "confidence": 0.95,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "500.00"
+              }
+            ]
+          },
+          "total_amount": {
+            "value": "60283.67",
+            "confidence": 0.95,
+            "evidence": [
+              {
+                "page_number": 2,
+                "text": "60283.67"
+              }
+            ]
+          },
+          "line_items": [
+            {
+              "description": "Managed 48-port network switches",
+              "quantity": "4",
+              "unit_price": "1245.00",
+              "line_total": "4980.00"
+            },
+            {
+              "description": "Enterprise wireless access points",
+              "quantity": "18",
+              "unit_price": "298.00",
+              "line_total": "5364.00"
+            },
+            {
+              "description": "10G SFP+ transceiver modules",
+              "quantity": "24",
+              "unit_price": "89.50",
+              "line_total": "2148.00"
+            },
+            {
+              "description": "Rackmount UPS 3000VA",
+              "quantity": "3",
+              "unit_price": "1595.00",
+              "line_total": "4785.00"
+            },
+            {
+              "description": "UPS replacement battery modules",
+              "quantity": "6",
+              "unit_price": "412.00",
+              "line_total": "2472.00"
+            },
+            {
+              "description": "Certified CAT6 cable runs",
+              "quantity": "40",
+              "unit_price": "72.50",
+              "line_total": "2900.00"
+            },
+            {
+              "description": "24-port patch panels",
+              "quantity": "4",
+              "unit_price": "185.00",
+              "line_total": "740.00"
+            },
+            {
+              "description": "CAT6 patch leads, 2 m",
+              "quantity": "120",
+              "unit_price": "9.75",
+              "line_total": "1170.00"
+            },
+            {
+              "description": "Pre-installation site survey",
+              "quantity": "2",
+              "unit_price": "975.00",
+              "line_total": "1950.00"
+            },
+            {
+              "description": "Perimeter firewall appliances",
+              "quantity": "2",
+              "unit_price": "2420.00",
+              "line_total": "4840.00"
+            },
+            {
+              "description": "Secure endpoint gateways",
+              "quantity": "6",
+              "unit_price": "815.00",
+              "line_total": "4890.00"
+            },
+            {
+              "description": "Network configuration, engineer-days",
+              "quantity": "5",
+              "unit_price": "1250.00",
+              "line_total": "6250.00"
+            },
+            {
+              "description": "On-site commissioning, engineer-days",
+              "quantity": "4",
+              "unit_price": "1125.00",
+              "line_total": "4500.00"
+            },
+            {
+              "description": "Serialized asset tagging",
+              "quantity": "126",
+              "unit_price": "6.25",
+              "line_total": "787.50"
+            },
+            {
+              "description": "Environmental rack monitors",
+              "quantity": "8",
+              "unit_price": "236.00",
+              "line_total": "1888.00"
+            },
+            {
+              "description": "Three-year support extension",
+              "quantity": "3",
+              "unit_price": "1350.00",
+              "line_total": "4050.00"
+            },
+            {
+              "description": "Remote rollout coordination, days",
+              "quantity": "3",
+              "unit_price": "820.00",
+              "line_total": "2460.00"
+            },
+            {
+              "description": "As-built documentation and handover",
+              "quantity": "1",
+              "unit_price": "1580.00",
+              "line_total": "1580.00"
+            }
+          ],
+          "ambiguous_document": false,
+          "tax_inclusive": false
+        },
+        "checks": [
+          {
+            "code": "LINE_1",
+            "state": "PASS",
+            "expected": "4980.00",
+            "observed": "4980.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_2",
+            "state": "PASS",
+            "expected": "5364.00",
+            "observed": "5364.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_3",
+            "state": "PASS",
+            "expected": "2148.00",
+            "observed": "2148.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_4",
+            "state": "PASS",
+            "expected": "4785.00",
+            "observed": "4785.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_5",
+            "state": "PASS",
+            "expected": "2472.00",
+            "observed": "2472.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_6",
+            "state": "PASS",
+            "expected": "2900.00",
+            "observed": "2900.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_7",
+            "state": "PASS",
+            "expected": "740.00",
+            "observed": "740.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_8",
+            "state": "PASS",
+            "expected": "1170.00",
+            "observed": "1170.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_9",
+            "state": "PASS",
+            "expected": "1950.00",
+            "observed": "1950.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_10",
+            "state": "PASS",
+            "expected": "4840.00",
+            "observed": "4840.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_11",
+            "state": "PASS",
+            "expected": "4890.00",
+            "observed": "4890.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_12",
+            "state": "PASS",
+            "expected": "6250.00",
+            "observed": "6250.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_13",
+            "state": "PASS",
+            "expected": "4500.00",
+            "observed": "4500.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_14",
+            "state": "PASS",
+            "expected": "787.50",
+            "observed": "787.50",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_15",
+            "state": "PASS",
+            "expected": "1888.00",
+            "observed": "1888.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_16",
+            "state": "PASS",
+            "expected": "4050.00",
+            "observed": "4050.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_17",
+            "state": "PASS",
+            "expected": "2460.00",
+            "observed": "2460.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "LINE_18",
+            "state": "PASS",
+            "expected": "1580.00",
+            "observed": "1580.00",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "SUBTOTAL",
+            "state": "PASS",
+            "expected": "57754.50",
+            "observed": "57754.50",
+            "variance": "0.00",
+            "tolerance": "0.01"
+          },
+          {
+            "code": "TOTAL",
+            "state": "FAIL",
+            "expected": "60158.67",
+            "observed": "60283.67",
+            "variance": "125.00",
+            "tolerance": "0.01"
+          }
+        ],
+        "route_reasons": [
+          "TOTAL_FAIL"
+        ],
+        "math_validated": false,
+        "telemetry": {
+          "provider": "fixture",
+          "model": "synthetic-v1",
+          "latency_ms": 0,
+          "input_tokens": null,
+          "output_tokens": null,
+          "estimated_cost_usd": "0",
+          "prompt_version": "fixture-v1",
+          "schema_version": "1",
+          "pricing_version": "fixture-no-api"
+        }
+      }
+    }
   }
 ]

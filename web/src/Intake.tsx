@@ -17,6 +17,7 @@ export default function Intake({
   provider,
   fallback,
   maxPages,
+  maxFileMb,
   publicPreview,
 }: {
   token: string;
@@ -25,6 +26,7 @@ export default function Intake({
   provider: string;
   fallback: boolean;
   maxPages: number;
+  maxFileMb: number;
   publicPreview: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -32,8 +34,8 @@ export default function Intake({
   const [dragging, setDragging] = useState(false);
   async function upload(file?: File) {
     if (!file || busy) return;
-    if (file.size > 20 * 1024 * 1024) {
-      onError("Please choose a document smaller than 20 MB.");
+    if (file.size > maxFileMb * 1024 * 1024) {
+      onError(`Please choose a document smaller than ${maxFileMb} MB.`);
       return;
     }
     setBusy(true);
@@ -100,7 +102,7 @@ export default function Intake({
             <Upload size={20} />
           </div>
           <h3>Drop an invoice here</h3>
-          <p>PDF, PNG, JPG or WEBP · Up to 20 MB / {maxPages} pages</p>
+          <p>PDF, PNG, JPG or WEBP · Up to {maxFileMb} MB / {maxPages} pages</p>
           <button disabled={busy} onClick={() => input.current?.click()}>
             <Upload size={14} />
             {busy ? "Adding document…" : "Choose a document"}
@@ -138,7 +140,7 @@ export default function Intake({
         <div className="panel-head">
           <div>
             <h2>See the guardrails at work</h2>
-            <p>Offline fixtures · No model call · Real validation workflow</p>
+            <p>Synthetic fixtures · No model call · Real validation workflow</p>
           </div>
           <ScanLine size={19} className="muted" />
         </div>
@@ -161,6 +163,12 @@ export default function Intake({
               title: "The uncertain date",
               copy: "Correct math. One field still needs a human.",
               icon: FileText,
+            },
+            {
+              id: "helixpoint",
+              title: "The enterprise invoice",
+              copy: "18 lines across two pages. A $125 total error is held for review.",
+              icon: TriangleAlert,
             },
           ].map((item) => (
             <button

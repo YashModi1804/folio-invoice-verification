@@ -64,7 +64,7 @@ export async function previewRequest<T>(path: string, options: RequestInit): Pro
   if (path === "/documents" && method === "POST")
     throw new Error("This public preview accepts synthetic samples only. Private uploads require the hosted API.");
 
-  const sample = path.match(/^\/samples\/(clean|variance|uncertain)$/);
+  const sample = path.match(/^\/samples\/(clean|variance|uncertain|helixpoint)$/);
   if (sample && method === "POST") {
     const kind = sample[1];
     const template = store.examples.get(kind);

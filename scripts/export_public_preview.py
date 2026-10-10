@@ -33,7 +33,11 @@ def export() -> None:
                 "job": {
                     "job_id": f"preview-{kind}",
                     "correlation_id": f"synthetic-{kind}",
-                    "filename": f"northline-{kind}.pdf",
+                    "filename": (
+                        "helixpoint-enterprise.pdf"
+                        if kind == "helixpoint"
+                        else f"northline-{kind}.pdf"
+                    ),
                     "status": status,
                     "page_count": 2,
                     "mode": "fixture",

@@ -69,3 +69,14 @@ rehearse the real API/review workflow, and preserve measured demo results.
 Add Groq vision as an explicit alternative at the user's request. Enforce its
 model-specific page/payload limits before inference; validate JSON locally, retain
 actual provider provenance, and apply the same consent-based local fallback.
+
+## Follow-up — private public demo
+
+Keep the operator token private. Add opt-in, anonymous guest workspaces
+with server-side ownership checks on every document, review, page, metric and ERP
+route. Seed each guest with labeled synthetic fixtures, including HelixPoint.
+Bound live guest uploads per guest and across the site each rolling day. Keep
+guest access and labeled samples available; make each personal upload and its
+history inaccessible after two hours, then clean it up when the worker is awake. Verify the
+security-header pass and guest behavior in separate local commits. Do not push or
+change Render configuration without separate approval.

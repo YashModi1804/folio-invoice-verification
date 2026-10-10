@@ -1,17 +1,19 @@
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException
 from sqlalchemy import select, update
 
-from app.api import authenticate, get_job, router, serialize
+from app.api import CurrentAccess, get_job, router, serialize, visible_jobs
 from app.db import AuditEvent, Job, ReviewDecision, Session, timestamp
 from app.domain.models import Decision, Invoice
 from app.domain.verify import verify
 
 
 @router.get("/review-tasks")
-def review_tasks():
+def review_tasks(access: CurrentAccess):
     with Session() as db:
         jobs = db.scalars(
-            select(Job).where(Job.status == "REQUIRES_HUMAN_REVIEW").order_by(Job.created_at)
+            select(Job)
+            .where(Job.status == "REQUIRES_HUMAN_REVIEW", *visible_jobs(access))
+            .order_by(Job.created_at)
         ).all()
         return sorted(
             [serialize(j) for j in jobs],
@@ -20,9 +22,9 @@ def review_tasks():
 
 
 @router.post("/review-tasks/{job_id}/decision")
-def decide(job_id: str, decision: Decision, actor: str = Depends(authenticate)):
+def decide(job_id: str, decision: Decision, access: CurrentAccess):
     with Session.begin() as db:
-        job = get_job(db, job_id)
+        job = get_job(db, job_id, access)
         if job.status != "REQUIRES_HUMAN_REVIEW":
             raise HTTPException(409, "This review is already resolved or unavailable")
         original = Invoice.model_validate(job.result["invoice"])
@@ -47,7 +49,7 @@ def decide(job_id: str, decision: Decision, actor: str = Depends(authenticate)):
         db.add(
             ReviewDecision(
                 job_id=job_id,
-                actor=actor,
+                actor=access.actor,
                 action=decision.action,
                 note=decision.note,
                 corrected_invoice=after,
@@ -58,7 +60,7 @@ def decide(job_id: str, decision: Decision, actor: str = Depends(authenticate)):
             AuditEvent(
                 job_id=job_id,
                 event=status,
-                actor=actor,
+                actor=access.actor,
                 details={"changes": changes, "note": decision.note, "source_extraction_version": 1},
             )
         )
@@ -66,9 +68,9 @@ def decide(job_id: str, decision: Decision, actor: str = Depends(authenticate)):
 
 
 @router.get("/jobs/{job_id}/audit")
-def audit(job_id: str):
+def audit(job_id: str, access: CurrentAccess):
     with Session() as db:
-        get_job(db, job_id)
+        get_job(db, job_id, access)
         return [
             {
                 "event": e.event,
@@ -85,9 +87,9 @@ def audit(job_id: str):
 
 
 @router.get("/jobs/{job_id}/decision")
-def decision_detail(job_id: str):
+def decision_detail(job_id: str, access: CurrentAccess):
     with Session() as db:
-        get_job(db, job_id)
+        get_job(db, job_id, access)
         item = db.scalar(select(ReviewDecision).where(ReviewDecision.job_id == job_id))
         if item is None:
             return None
