@@ -1,26 +1,53 @@
 # Folio
 
-**Invoice extraction with independent verification and an auditable human review workflow.**
+**AI invoice processing with independent verification and human review.**
 
-Folio is a working agency demo and integration foundation. A model proposes invoice
-data; Python checks the arithmetic and routing policy; an operator resolves exceptions.
-The original extraction survives every review decision.
+[Live app](https://folio-live-jutf.onrender.com/) ·
+[Sample-only preview](https://yashmodi1804.github.io/folio-invoice-verification/) ·
+[Architecture](#how-it-works) · [Run locally](#run-locally)
 
-## Try it locally
+Folio is a full-stack proof of capability for agencies building document automation.
+It turns invoice PDFs and images into structured records, checks the numbers in
+Python, and sends uncertain or inconsistent results to a reviewer. The model
+proposes data; it never decides whether its own extraction is correct. Every review
+decision is recorded without overwriting the original extraction.
 
-The current workspace is already installed and built. Open VS Code's **Terminal → Run
-Task → Folio: start demo**, or run:
+### Explore the demo
 
-```sh
-.venv/bin/python scripts/dev.py
-```
+Open the **[live app](https://folio-live-jutf.onrender.com/)** to enter a private
+guest workspace—no account or invitation needed. Start with the labeled synthetic
+**HelixPoint** sample: an 18-line, two-page enterprise invoice whose printed total
+is $125 too high. Folio loads its labeled fixture extraction, shows the arithmetic
+discrepancy and source evidence, then routes the record to human review. You can also
+upload a synthetic invoice to exercise live Groq extraction, subject to the demo's
+usage limits.
 
-Open **http://127.0.0.1:8000**. The local demo token is `local-demo-only`.
-Stop the API and worker together with Ctrl-C. Do not run a second copy on port 8000.
-This machine uses ignored `.tools` links to the bundled Node/pnpm runtimes. Open a new
-VS Code terminal to pick up that PATH; the Python interpreter is `.venv/bin/python`.
+The **[GitHub Pages preview](https://yashmodi1804.github.io/folio-invoice-verification/)**
+is a separate, sample-only walkthrough. It does not accept uploads or call an AI
+provider. The live app runs on a free Render deployment, which may take time to wake
+after inactivity; its free database has a fixed expiry. Neither surface should be
+used for confidential customer documents.
 
-For a fresh checkout, install Python 3.12+, Node 24, and pnpm 11.19.0, then:
+### What this demonstrates
+
+- **Bounded intake:** validates file content and size, renders multi-page documents,
+  and persists asynchronous jobs with idempotency protection.
+- **Traceable extraction:** validates provider output against typed schemas and shows
+  page-level evidence, provider usage, and failure details.
+- **Independent decisions:** verifies line items, subtotal, and total with `Decimal`;
+  incomplete or inconsistent invoices go to human review instead of silently entering
+  an approved dataset.
+- **Auditable handoff:** preserves the original result, appends reviewer decisions,
+  and exposes approved records through a versioned ERP-ready JSON contract.
+
+**Stack:** Python, FastAPI, Pydantic v2, SQLAlchemy, Alembic, PostgreSQL, PyMuPDF,
+React, TypeScript, Vite, and a database-backed worker. Groq, Gemini, and local
+Ollama adapters are available; synthetic fixtures are explicitly labeled and make
+no model calls.
+
+## Run locally
+
+Install Python 3.12+, Node 24, and pnpm 11.19.0, then:
 
 ```sh
 python3 -m venv .venv
@@ -34,14 +61,18 @@ pnpm --dir web build
 The startup script applies migrations, starts the database-backed worker, and serves
 the compiled console through FastAPI. SQLite and private local files make the demo
 usable without Docker, cloud accounts, or a model key. Fonts ship with the frontend.
+Open **http://127.0.0.1:8000** and use the local demo token `local-demo-only`.
+Stop the API and worker together with Ctrl-C. VS Code users can instead run
+**Terminal → Run Task → Folio: start demo** after setup.
 
-## Three honest demonstrations
+## Four honest demonstrations
 
 | Sample | Expected behavior |
 | --- | --- |
 | Clean invoice | Two pages, complete evidence, all arithmetic checks pass; automatic approval. |
 | $50 discrepancy | Printed total is 1300.00, calculated total is 1250.00; human review. |
 | Uncertain date | Arithmetic passes, fixture date confidence is 0.62; human review. |
+| HelixPoint enterprise invoice | Two pages and 18 line items; subtotal passes, printed total is $125 too high; human review. |
 
 These are explicitly labeled **synthetic fixtures**, including their confidence values.
 They exercise real persistence, verification, routing, and review. They are not live
