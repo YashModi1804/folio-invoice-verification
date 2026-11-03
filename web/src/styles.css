@@ -816,6 +816,28 @@ tbody tr:hover {
 .connection-card button + button {
   margin-top: 8px;
 }
+.sample-fallback {
+  margin-top: 16px;
+}
+.sample-fallback a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+.sample-fallback small {
+  display: block;
+  margin-top: 6px;
+  line-height: 1.6;
+}
+.sample-action {
+  display: block;
+  margin-top: 5px;
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 600;
+}
 .login p {
   font-size: 13px;
   color: var(--muted);

@@ -39,6 +39,9 @@ results, source pages, reviews, exports and metrics. Existing operator records
 remain in the operator workspace. Synthetic fixture examples may be seeded into
 each guest workspace but must stay visibly labeled and make no provider call.
 Guest access and labeled synthetic samples do not expire by application policy.
+Opening a guest sample reuses its existing private record, including any review
+decision; it does not create another job or consume the live upload allowance.
+Missing examples in older workspaces are restored once without inference.
 Each guest upload, result and review history becomes inaccessible after two hours;
 cleanup runs when the service is awake, so the UI must not promise physical deletion
 at an exact minute. Guest live uploads have per-guest and site-wide daily caps.
@@ -54,6 +57,8 @@ Public links may use a static Folio launch page. It probes a minimal public read
 endpoint without credentials and opens the live app only after a ready response.
 Startup attempts are bounded; the synthetic preview remains available independently
 of backend sleep or database expiry. Direct Render URLs still have host cold starts.
+Live connection and guest-admission failures also offer the fixed public sample
+preview link, without forwarding credentials or document identifiers.
 
 The reviewer can switch between the original extraction and the reviewed snapshot.
 ERP exports use the effective reviewed checks and actual approval timestamp.

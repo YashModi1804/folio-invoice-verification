@@ -1,9 +1,13 @@
+import hashlib
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+
+from sqlalchemy import delete, select
 
 from app import api, retention, worker
 from app.config import settings
-from app.db import DocumentSource, GuestUploadUsage, Job, now
-from app.samples import sample_pdf
+from app.db import AuditEvent, DocumentSource, GuestUploadUsage, Job, now
+from app.samples import sample_invoice, sample_pdf
 from app.storage import document_path
 
 
@@ -23,11 +27,11 @@ def test_guests_cannot_read_each_other_or_operator_records(client, monkeypatch):
     first, second = guest(client), guest(client)
     owned_job = client.post("/api/v1/samples/helixpoint", headers=first).json()["job_id"]
     assert worker.run_once()
-    assert worker.run_once()
+    assert not worker.run_once()
 
     first_jobs = client.get("/api/v1/jobs", headers=first).json()
     second_jobs = client.get("/api/v1/jobs", headers=second).json()
-    assert len(first_jobs) == 5
+    assert len(first_jobs) == 4
     assert len(second_jobs) == 4
     assert owned_job in {job["job_id"] for job in first_jobs}
     assert owned_job not in {job["job_id"] for job in second_jobs}
@@ -67,6 +71,161 @@ def test_guests_cannot_read_each_other_or_operator_records(client, monkeypatch):
     assert owned["status"] == "REQUIRES_HUMAN_REVIEW"
     assert len(owned["result"]["invoice"]["line_items"]) == 18
     assert owned["result"]["checks"][-1]["variance"] == "125.00"
+
+
+def test_guest_can_reopen_samples_without_creating_work_or_using_upload_allowance(
+    client, monkeypatch
+):
+    monkeypatch.setattr(settings, "guest_enabled", True)
+    headers = guest(client)
+    initial = client.get("/api/v1/jobs", headers=headers).json()
+    sample_ids = {job["filename"]: job["job_id"] for job in initial}
+
+    def unexpected_work(*args, **kwargs):
+        raise AssertionError("Opening a sample must not parse, store or call a provider")
+
+    monkeypatch.setattr(api, "inspect", unexpected_work)
+    monkeypatch.setattr(api, "save_source", unexpected_work)
+    monkeypatch.setattr(worker.FixtureProvider, "extract", unexpected_work)
+    for _ in range(3):
+        for kind in api.SAMPLES:
+            response = client.post(f"/api/v1/samples/{kind}", headers=headers)
+            assert response.status_code == 202
+            assert response.json()["job_id"] == sample_ids[f"{kind}-sample.pdf"]
+    assert len(client.get("/api/v1/jobs", headers=headers).json()) == 4
+    assert not worker.run_once()
+    with api.Session() as db:
+        assert db.query(GuestUploadUsage).count() == 0
+        assert db.query(AuditEvent).count() == 4
+        assert db.query(DocumentSource).count() == 0
+
+
+def test_reopening_guest_sample_preserves_review_and_original(client, monkeypatch):
+    monkeypatch.setattr(settings, "guest_enabled", True)
+    headers = guest(client)
+    opened = client.post("/api/v1/samples/helixpoint", headers=headers).json()
+    job_id = opened["job_id"]
+    original = opened["result"]
+    corrected = sample_invoice("helixpoint").model_dump(mode="json")
+    corrected["total_amount"]["value"] = original["checks"][-1]["expected"]
+    assert (
+        client.post(
+            f"/api/v1/review-tasks/{job_id}/decision",
+            headers=headers,
+            json={
+                "action": "approve",
+                "note": "Verified the printed total discrepancy.",
+                "corrected_invoice": corrected,
+            },
+        ).status_code
+        == 200
+    )
+    audit = client.get(f"/api/v1/jobs/{job_id}/audit", headers=headers).json()
+    decision = client.get(f"/api/v1/jobs/{job_id}/decision", headers=headers).json()
+    reopened = client.post("/api/v1/samples/helixpoint", headers=headers).json()
+    assert reopened["job_id"] == job_id
+    assert reopened["status"] == "HUMAN_APPROVED"
+    assert reopened["summary"]["total_amount"] == corrected["total_amount"]["value"]
+    assert reopened["result"] == original
+    assert client.get(f"/api/v1/jobs/{job_id}/audit", headers=headers).json() == audit
+    assert client.get(f"/api/v1/jobs/{job_id}/decision", headers=headers).json() == decision
+
+
+def test_guest_sample_reopens_canonical_record_after_legacy_allowance_is_full(client, monkeypatch):
+    monkeypatch.setattr(settings, "guest_enabled", True)
+    headers = guest(client)
+    canonical = client.post("/api/v1/samples/helixpoint", headers=headers).json()["job_id"]
+    with api.Session.begin() as db:
+        original = db.get(Job, canonical)
+        original.idempotency_key = hashlib.sha256(
+            f"{original.workspace_id}:sample:helixpoint".encode()
+        ).hexdigest()
+        for index in range(4):
+            db.add(
+                Job(
+                    workspace_id=original.workspace_id,
+                    idempotency_key=f"legacy-replay-{index}",
+                    checksum=original.checksum,
+                    filename=original.filename,
+                    media_type=original.media_type,
+                    page_count=original.page_count,
+                    status=original.status,
+                    sample=original.sample,
+                    provider="fixture",
+                    result=original.result,
+                    created_at=original.created_at - timedelta(days=1),
+                )
+            )
+    assert len(client.get("/api/v1/jobs", headers=headers).json()) == 8
+    response = client.post("/api/v1/samples/helixpoint", headers=headers)
+    assert response.status_code == 202
+    assert response.json()["job_id"] == canonical
+    assert len(client.get("/api/v1/jobs", headers=headers).json()) == 8
+
+
+def test_guest_sample_legacy_lookup_stays_in_its_workspace(client, monkeypatch):
+    monkeypatch.setattr(settings, "guest_enabled", True)
+    first, second = guest(client), guest(client)
+    first_id = client.post("/api/v1/samples/helixpoint", headers=first).json()["job_id"]
+    second_id = client.post("/api/v1/samples/helixpoint", headers=second).json()["job_id"]
+    with api.Session.begin() as db:
+        db.get(Job, first_id).idempotency_key = "legacy-first-sample"
+        db.get(Job, second_id).idempotency_key = "legacy-second-sample"
+    assert client.post("/api/v1/samples/helixpoint", headers=first).json()["job_id"] == first_id
+    assert client.post("/api/v1/samples/helixpoint", headers=second).json()["job_id"] == second_id
+
+
+def test_concurrent_missing_guest_sample_opens_seed_once_without_provider_work(client, monkeypatch):
+    monkeypatch.setattr(settings, "guest_enabled", True)
+    headers = guest(client)
+    job_id = client.post("/api/v1/samples/helixpoint", headers=headers).json()["job_id"]
+    with api.Session.begin() as db:
+        db.execute(delete(AuditEvent).where(AuditEvent.job_id == job_id))
+        db.delete(db.get(Job, job_id))
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        responses = list(
+            executor.map(
+                lambda _: client.post("/api/v1/samples/helixpoint", headers=headers), range(3)
+            )
+        )
+    assert all(response.status_code == 202 for response in responses)
+    assert len({response.json()["job_id"] for response in responses}) == 1
+    assert responses[0].json()["status"] == "REQUIRES_HUMAN_REVIEW"
+    assert len(client.get("/api/v1/jobs", headers=headers).json()) == 4
+    assert not worker.run_once()
+
+
+def test_operator_can_still_start_separate_sample_runs(client):
+    first = client.post("/api/v1/samples/helixpoint").json()
+    second = client.post("/api/v1/samples/helixpoint").json()
+    assert first["job_id"] != second["job_id"]
+    assert first["status"] == second["status"] == "QUEUED"
+    with api.Session() as db:
+        assert len(db.scalars(select(Job)).all()) == 2
+
+
+def test_guest_upload_idempotency_key_cannot_block_missing_sample_repair(client, monkeypatch):
+    monkeypatch.setattr(settings, "guest_enabled", True)
+    headers = guest(client)
+    job_id = client.post("/api/v1/samples/helixpoint", headers=headers).json()["job_id"]
+    with api.Session.begin() as db:
+        db.execute(delete(AuditEvent).where(AuditEvent.job_id == job_id))
+        db.delete(db.get(Job, job_id))
+    uploaded = client.post(
+        "/api/v1/documents",
+        files={"file": ("private.pdf", sample_pdf("clean"))},
+        headers={**headers, "Idempotency-Key": "sample:helixpoint"},
+    )
+    assert uploaded.status_code == 202
+    repaired = client.post("/api/v1/samples/helixpoint", headers=headers)
+    assert repaired.status_code == 202
+    assert repaired.json()["job_id"] != uploaded.json()["job_id"]
+    assert repaired.json()["status"] == "REQUIRES_HUMAN_REVIEW"
+    assert len(client.get("/api/v1/jobs", headers=headers).json()) == 5
+    assert (
+        client.post("/api/v1/samples/helixpoint", headers=headers).json()["job_id"]
+        == repaired.json()["job_id"]
+    )
 
 
 def test_guest_upload_limits_do_not_count_samples(client, monkeypatch):

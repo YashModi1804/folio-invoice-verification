@@ -18,6 +18,7 @@ import { ApiError, request } from "./api";
 import { labels, type Job } from "./types";
 import Intake from "./Intake";
 import Document from "./Document";
+import SamplePreviewFallback from "./SamplePreviewFallback";
 import { PUBLIC_PREVIEW } from "./preview";
 import { matchesDocument, RequestScope } from "./workspace";
 
@@ -294,6 +295,9 @@ export default function App() {
               Operator access
             </button>
           )}
+          {connectionError && (
+            <SamplePreviewFallback publicPreview={PUBLIC_PREVIEW} />
+          )}
         </section>
       </div>
     );
@@ -474,7 +478,12 @@ export default function App() {
           )}
           {(error || loadError) && (
             <div className="error" role="alert">
-              <span>{error || loadError}</span>
+              <div>
+                <span>{error || loadError}</span>
+                {loadError && (
+                  <SamplePreviewFallback publicPreview={PUBLIC_PREVIEW} />
+                )}
+              </div>
               <button
                 className="ghost"
                 aria-label="Dismiss error"
@@ -571,6 +580,7 @@ export default function App() {
                   <Intake
                     token={token}
                     publicPreview={PUBLIC_PREVIEW}
+                    guest={workspace === "guest"}
                     provider={provider}
                     fallback={fallback}
                     maxPages={maxPages}

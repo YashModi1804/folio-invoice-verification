@@ -19,6 +19,7 @@ export default function Intake({
   maxPages,
   maxFileMb,
   publicPreview,
+  guest,
 }: {
   token: string;
   onCreated: (job: Job) => void;
@@ -28,6 +29,7 @@ export default function Intake({
   maxPages: number;
   maxFileMb: number;
   publicPreview: boolean;
+  guest: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -180,7 +182,11 @@ export default function Intake({
         <div className="panel-head">
           <div>
             <h2>See the guardrails at work</h2>
-            <p>Synthetic fixtures · No model call · Real validation workflow</p>
+            <p>
+              {guest
+                ? "Synthetic examples · No model call · Your saved reviews stay with each sample"
+                : "Synthetic fixtures · No model call · Real validation workflow"}
+            </p>
           </div>
           <ScanLine size={19} className="muted" />
         </div>
@@ -215,6 +221,7 @@ export default function Intake({
               className="sample"
               key={item.id}
               disabled={busy}
+              aria-label={guest ? `Open sample: ${item.title}` : undefined}
               onClick={() => void sample(item.id)}
             >
               <span className="sample-icon">
@@ -223,6 +230,7 @@ export default function Intake({
               <span className="sample-copy">
                 <strong>{item.title}</strong>
                 <small>{item.copy}</small>
+                {guest && <span className="sample-action">Open sample</span>}
               </span>
               <ArrowRight size={15} />
             </button>

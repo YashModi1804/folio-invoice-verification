@@ -61,50 +61,57 @@ guest_router = APIRouter(prefix="/api/v1")
 def seed_guest_samples(db, workspace_id: str) -> None:
     """Create private, preverified fixture copies without inference calls."""
     for kind in SAMPLES:
-        invoice = sample_invoice(kind)
-        checks = verify(invoice)
-        status, reasons = route(invoice, checks, page_count=2)
-        source = sample_pdf(kind)
-        job = Job(
-            workspace_id=workspace_id,
-            idempotency_key=hashlib.sha256(f"{workspace_id}:sample:{kind}".encode()).hexdigest(),
-            checksum=hashlib.sha256(source).hexdigest(),
-            filename=f"{kind}-sample.pdf",
-            media_type="application/pdf",
-            page_count=2,
-            sample=kind,
-            provider="fixture",
-            status=status,
-            result={
-                "invoice": invoice.model_dump(mode="json"),
-                "checks": [check.model_dump(mode="json") for check in checks],
-                "route_reasons": reasons,
-                "math_validated": all(check.state == "PASS" for check in checks),
-                "telemetry": {
-                    "provider": "fixture",
-                    "model": "synthetic-v1",
-                    "input_tokens": None,
-                    "output_tokens": None,
-                    "estimated_cost_usd": "0",
-                    "pricing_version": "fixture-no-api",
-                    "latency_ms": 0,
-                    "prompt_version": "fixture-v1",
-                    "schema_version": "1",
-                },
+        seed_guest_sample(db, workspace_id, kind)
+
+
+def seed_guest_sample(db, workspace_id: str, kind: str) -> Job:
+    invoice = sample_invoice(kind)
+    checks = verify(invoice)
+    status, reasons = route(invoice, checks, page_count=2)
+    source = sample_pdf(kind)
+    job = Job(
+        workspace_id=workspace_id,
+        # Uploaded guest keys are SHA-256 hex strings; keep sample keys outside
+        # that namespace so an upload cannot occupy a missing sample's key.
+        idempotency_key=f"sample:{workspace_id}:{kind}",
+        checksum=hashlib.sha256(source).hexdigest(),
+        filename=f"{kind}-sample.pdf",
+        media_type="application/pdf",
+        page_count=2,
+        sample=kind,
+        provider="fixture",
+        status=status,
+        result={
+            "invoice": invoice.model_dump(mode="json"),
+            "checks": [check.model_dump(mode="json") for check in checks],
+            "route_reasons": reasons,
+            "math_validated": all(check.state == "PASS" for check in checks),
+            "telemetry": {
+                "provider": "fixture",
+                "model": "synthetic-v1",
+                "input_tokens": None,
+                "output_tokens": None,
+                "estimated_cost_usd": "0",
+                "pricing_version": "fixture-no-api",
+                "latency_ms": 0,
+                "prompt_version": "fixture-v1",
+                "schema_version": "1",
             },
-            completed_at=now(),
+        },
+        completed_at=now(),
+    )
+    db.add(job)
+    db.flush()
+    # Fixture PDFs are reproducible assets; avoid duplicating them for every visitor.
+    db.add(
+        AuditEvent(
+            job_id=job.id,
+            event="SAMPLE_LOADED",
+            actor="fixture",
+            details={"mode": "fixture", "kind": kind},
         )
-        db.add(job)
-        db.flush()
-        # Fixture PDFs are reproducible assets; avoid duplicating them for every visitor.
-        db.add(
-            AuditEvent(
-                job_id=job.id,
-                event="SAMPLE_LOADED",
-                actor="fixture",
-                details={"mode": "fixture", "kind": kind},
-            )
-        )
+    )
+    return job
 
 
 @guest_router.post("/guest-sessions", status_code=201)
@@ -295,6 +302,27 @@ async def upload(
 def upload_sample(kind: str, access: CurrentAccess):
     if kind not in SAMPLES:
         raise HTTPException(404, "Sample not found")
+    if access.guest:
+        with Session.begin() as db:
+            lock_guest_mutation(db)
+            canonical_key = f"sample:{access.workspace_id}:{kind}"
+            legacy_key = hashlib.sha256(f"{access.workspace_id}:sample:{kind}".encode()).hexdigest()
+            job = db.scalar(
+                select(Job)
+                .where(Job.workspace_id == access.workspace_id, Job.sample == kind)
+                .order_by(
+                    (Job.idempotency_key == canonical_key).desc(),
+                    (Job.idempotency_key == legacy_key).desc(),
+                    Job.created_at,
+                    Job.id,
+                )
+                .limit(1)
+            )
+            # Older workspaces may lack a newly introduced example. Create it once;
+            # opening an existing example must not reset a decision or consume quota.
+            if job is None:
+                job = seed_guest_sample(db, access.workspace_id, kind)
+            return serialize(job)
     return enqueue(sample_pdf(kind), f"{kind}-sample.pdf", str(uuid4()), access, kind)
 
 
