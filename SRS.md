@@ -45,6 +45,21 @@ at an exact minute. Guest live uploads have per-guest and site-wide daily caps.
 This is a demo access model, not client authentication, SSO, or a data-retention
 guarantee for third-party providers or the time-limited free database.
 
+New anonymous workspace creation is limited per rolling hour/day and by a total
+workspace cap, independently of upload quotas. Existing guests retain access when
+new admission is full. Request bodies are bounded as bytes arrive, and errors retain
+security headers without exposing internal exception text.
+
+Public links may use a static Folio launch page. It probes a minimal public readiness
+endpoint without credentials and opens the live app only after a ready response.
+Startup attempts are bounded; the synthetic preview remains available independently
+of backend sleep or database expiry. Direct Render URLs still have host cold starts.
+
+The reviewer can switch between the original extraction and the reviewed snapshot.
+ERP exports use the effective reviewed checks and actual approval timestamp.
+When page coverage is incomplete, human approval does not silently assert that
+missing line items have been checked.
+
 ## 2. Corrections Applied to the Original Draft
 
 | Original point | Correction in this SRS | Why it matters |
@@ -353,3 +368,15 @@ checks. Enforce documented model limits before requests: Qwen 3.8 27B permits
 three page images, Qwen 3.6 27B five, with a 20 MB serialized request limit.
 The UI must expose the active page limit. Groq may use the same consented local
 recovery path as Gemini, with the actual failed provider named in audit history.
+
+## 16. Native document resource isolation
+
+Untrusted document inspection, text planning and page rendering run in a short-lived
+child process, including source previews. The parent enforces a hard timeout and
+kills/reaps incomplete children; a single parser slot bounds concurrency per process.
+The Linux deployment enforces CPU, address-space and output limits. macOS retains
+wall/CPU/output limits but does not promise an address-space ceiling. No provider
+credentials are passed in the child environment. These bounds are not an OS sandbox.
+Exhausted guest allowances are checked before parsing and again atomically at admission.
+Busy parsing produces a retryable API response or worker deferral before inference;
+timeouts, native crashes and invalid output produce safe, documented error codes.

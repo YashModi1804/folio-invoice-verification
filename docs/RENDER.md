@@ -13,6 +13,12 @@ The instance created October 7, 2026 is scheduled to expire November 6, 2026.
 Upgrade or export before then if records must be kept. The worker removes source
 documents after seven days while preserving extraction and review audit records.
 
+Share the [Folio entry page](https://yashmodi1804.github.io/folio-invoice-verification/launch/).
+It probes only `/health/launch`, without credentials, for at most 90 seconds and opens
+the live workspace once ready. The sample-only walkthrough is always available from
+that page. This improves the waiting experience; it does not prevent free-service sleep
+or prolong the database lifetime. Direct Render URLs retain Render's wake-up behavior.
+
 ## Web service configuration
 
 Deploy the public GitHub repository as a Docker web service on the free plan in
@@ -42,6 +48,18 @@ samples without inference, including HelixPoint. Guest access has no application
 Each guest upload and its history become inaccessible after two hours; physical cleanup
 runs while the service is awake. The free database still has its own expiry.
 Do not claim deletion at the exact minute or across third-party systems.
+
+New guest sessions default to 60/hour, 250/day and 2,000 stored workspaces. Configure
+`GUEST_SESSIONS_PER_HOUR`, `GUEST_SESSIONS_PER_DAY`, and `GUEST_WORKSPACE_LIMIT` only
+after checking storage capacity; returning guests do not create replacement sessions.
+Requests are size-checked both at the header and while streaming, including JSON bodies.
+
+Native document operations run in child processes. Defaults are one parser per application
+process, `PARSER_TIMEOUT_SECONDS=15`, `PARSER_CPU_SECONDS=10`,
+`PARSER_MEMORY_MB=256` (Linux address-space limit) and `PARSER_MAX_OUTPUT_BYTES=16777216`.
+The parser child receives source bytes and parsing limits, not application credentials.
+Do not raise these limits on the free 512 MB host without measuring memory headroom.
+These are resource limits, not a complete operating-system security sandbox.
 
 Never add secrets to Git, `render.yaml`, screenshots, or Loom footage. The web
 service refuses startup with the default local token or a missing live-provider key.

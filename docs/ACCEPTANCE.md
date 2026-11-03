@@ -1,6 +1,10 @@
 # Verification and scope report
 
-## Verified locally
+This report preserves the original baseline and dated rehearsal results. For the current
+release, see [November review and verification](REVIEW_2026_11.md) and the
+[product acceptance gates](PRODUCT_REVIEW.md).
+
+## Original local baseline
 
 - Python 3.12; SQLite migration and separate worker startup.
 - 66 automated tests, passing without live credentials or a local model service.
@@ -19,9 +23,10 @@
   clean, two-page discrepancy and missing-date invoices. See [local results](LOCAL_INFERENCE.md).
 - Existing Gemini/fixture records retain their provider after switching to local AI.
 
-## Explicit implementation choices
+## Original implementation choices (superseded where noted)
 
-- Single operator token; no tenant identities or role separation.
+- Original baseline: a single operator token. The deployed demo now also has isolated
+  anonymous guest workspaces; these are browser credentials, not verified identities.
 - Private local files served through authenticated endpoints; no public/signed source URLs.
 - Database-backed queue and separate worker; no required Redis dependency.
 - Immutable extraction/check snapshot in the job aggregate; separate relational audit and
@@ -35,7 +40,8 @@
   is intended to use the user's selected free-tier model.
 - Rendering uses 108 DPI for the demo. Dense real invoices may require tuning with a
   representative dataset. Evidence is page/text-based; bounding-box highlighting is deferred.
-- Source retention is an explicit dry-run/apply command; it is not scheduled locally.
+- Source retention now runs in the worker; guest upload cleanup removes source bytes,
+  results and review history. See the current retention policy in the README.
 
 ## September 18 rehearsal update
 
@@ -51,10 +57,11 @@ Final paced run: all three synthetic invoices passed through Groq itself in
 was checked, not only route labels. A fourth, public layout preserved absent
 charges as null and correctly distinguished invoice total from balance due.
 
-## Not yet verified
+## Remaining validation limits
 
 - Extraction accuracy, confidence calibration, or live p95 latency on client documents.
-- Docker/PostgreSQL deployment; Docker is not installed in this environment.
+- Local Docker Compose execution; the Render Docker/PostgreSQL deployment has since
+  been exercised. Local Docker is not installed in this environment.
 - Production concurrency, load, backup/restore, public-hosting hardening, or compliance.
 
 ## Meaning of “production-grade” here

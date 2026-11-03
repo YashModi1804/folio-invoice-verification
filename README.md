@@ -2,7 +2,7 @@
 
 **AI invoice processing with independent verification and human review.**
 
-[Live app](https://folio-live-jutf.onrender.com/) ·
+[Try Folio](https://yashmodi1804.github.io/folio-invoice-verification/launch/) ·
 [Sample-only preview](https://yashmodi1804.github.io/folio-invoice-verification/) ·
 [Architecture](#how-it-works) · [Run locally](#run-locally)
 
@@ -14,13 +14,15 @@ decision is recorded without overwriting the original extraction.
 
 ### Explore the demo
 
-Open the **[live app](https://folio-live-jutf.onrender.com/)** to enter a private
+Open **[Try Folio](https://yashmodi1804.github.io/folio-invoice-verification/launch/)** to enter a private
 guest workspace—no account or invitation needed. Start with the labeled synthetic
 **HelixPoint** sample: an 18-line, two-page enterprise invoice whose printed total
 is $125 too high. Folio loads its labeled fixture extraction, shows the arithmetic
 discrepancy and source evidence, then routes the record to human review. You can also
 upload a synthetic invoice to exercise live Groq extraction, subject to the demo's
-usage limits.
+usage limits. The branded entry page waits for the live workspace to be ready and
+offers the sample walkthrough immediately. Share this link rather than the direct
+Render address, which can show Render's wake-up screen after inactivity.
 
 The **[GitHub Pages preview](https://yashmodi1804.github.io/folio-invoice-verification/)**
 is a separate, sample-only walkthrough. It does not accept uploads or call an AI
@@ -133,7 +135,7 @@ probability. Page citations are review aids, not independently verified provenan
 
 ```mermaid
 flowchart LR
-    U[Upload or sample] --> A[FastAPI + operator token]
+    U[Upload or sample] --> A[FastAPI + workspace credential]
     A --> D[(Database jobs)]
     A --> S[Private source files]
     D --> W[Separate worker]
@@ -156,7 +158,10 @@ flowchart LR
 - **Verification:** line calculations, subtotal, and total use `Decimal` and explicit
   rounding. Missing amounts do not become zero. USD/EUR/GBP are supported in v1.
 - **Review:** corrections and mandatory notes produce a separate decision snapshot.
-  Human approval can explicitly accept remaining discrepancies; the checks stay visible.
+  Switch between the reviewed record and original extraction; corrected fields are
+  labeled **Reviewed**, and citations still refer to the original source. Human approval
+  can explicitly accept remaining discrepancies; the checks stay visible. ERP exports
+  use the effective reviewed checks and actual approval timestamp.
 - **Telemetry:** recorded provider usage, processing latency, policy reasons, health
   endpoints, and JSON worker logs without source text.
 - **ERP handoff:** approved records expose a versioned, vendor-neutral JSON export with an
@@ -190,6 +195,7 @@ still requires a valid operator or guest credential and checks workspace ownersh
 | POST | `/api/v1/jobs/{id}/erp-export/acknowledgements` | Persist a connector's external record ID |
 | GET | `/api/v1/metrics` | Counts, review/failure rates, and processing latency percentiles |
 | GET | `/health/live`, `/health/ready` | API liveness; database/storage/worker readiness |
+| GET | `/health/launch` | Minimal readiness signal for the public entry page; no credentials |
 
 ## Development and verification
 
@@ -198,12 +204,14 @@ still requires a valid operator or guest credential and checks workspace ownersh
 .venv/bin/ruff check .
 .venv/bin/ruff format --check .
 .venv/bin/python -m app.evaluate
+pnpm --dir web test
 pnpm --dir web build
 ```
 
 For frontend hot reload, run `pnpm --dir web dev` alongside the API and worker.
 Vite proxies API traffic to port 8000. VS Code tasks and extension recommendations
-are included. CI runs the Python checks, migration, offline evaluation, and frontend build.
+are included. CI runs the Python checks, migration, offline evaluation, frontend tests,
+and production build.
 
 Tests cover invalid documents, decimal tolerance, incomplete fields, false confidence,
 review history, duplicate decisions, idempotency, provider schema failures, transient
@@ -236,6 +244,10 @@ when the embedded worker runs cleanup; free-service sleep means physical deletio
 not guaranteed at the exact expiry minute. Clearing browser storage loses the anonymous
 credential. The free Render database itself has a fixed expiry, so it cannot promise
 permanent storage for any workspace.
+New workspaces are bounded to 60 per hour, 250 per day, and 2,000 total by default;
+returning guests remain usable after new-workspace capacity is reached. These limits
+bound fixture/storage growth as well as live inference usage. HTTP requests also have
+streamed body limits; quota decisions serialize concurrent guest admissions.
 These bounds are a demo safeguard, not a promise of provider availability or
 production-grade account security.
 
@@ -250,8 +262,17 @@ not available on the development machine, so this path is supplied but not execu
 
 For a client deployment, add the client's identity/tenant isolation, managed storage,
 TLS, rate limiting, monitoring, backups, and provider data-processing agreement.
-The local demo token is public and unsuitable for a shared environment. PDFs render in the
-worker process; hostile public intake needs stronger process/resource isolation.
+The local demo token is public and unsuitable for a shared environment. Native PDF/image
+inspection, rendering and text planning run in short-lived child processes, with one
+parser at a time per application process, a 15-second wall timeout, 10-second CPU limit,
+and bounded output. Linux enforces a 256 MiB address-space ceiling; macOS does not enforce
+that memory ceiling. Busy requests are retryable; a busy worker requeues before inference.
+This limits resource use but is not an operating-system security sandbox or a load benchmark.
+
+Before proprietary redistribution, review dependency licensing and choose a project
+license. In particular, [PyMuPDF is offered under AGPL or a commercial license](https://pymupdf.readthedocs.io/en/latest/about.html).
+This repository does not currently grant a project-wide license; public source access
+does not itself establish unrestricted white-label reuse rights.
 
 Source retention defaults to seven days. Preview expiration without deleting anything:
 
@@ -270,3 +291,4 @@ See [the live document pack and Loom plan](docs/DEMO_PACK.md),
 [the continuous 60-second live demo](docs/LOOM_60S_LIVE.md),
 [the offline demo script](docs/DEMO.md), [verification report](docs/ACCEPTANCE.md),
 [SRS](SRS.md), and [build plan](BUILD_PLAN.md).
+Current priorities and release gates are in the [product review](docs/PRODUCT_REVIEW.md).

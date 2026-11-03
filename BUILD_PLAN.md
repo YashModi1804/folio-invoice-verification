@@ -28,7 +28,8 @@
 ## Implementation decisions
 
 Delivery status: all 24 planned slices implemented. See docs/ACCEPTANCE.md for measured
-verification and explicit deployment/live-provider limitations. No GitHub remote was used.
+verification and explicit deployment/live-provider limitations. The public repository
+and temporary Render demo were added after the original local delivery.
 
 - Working name: Folio. Single protected operator workspace.
 - Start with invoices in USD/EUR/GBP; unsupported currencies route to review.
@@ -80,3 +81,20 @@ guest access and labeled samples available; make each personal upload and its
 history inaccessible after two hours, then clean it up when the worker is awake. Verify the
 security-header pass and guest behavior in separate local commits. Do not push or
 change Render configuration without separate approval.
+
+## Follow-up — reliability, security and reviewer experience (November 2026)
+
+The owner authorized this review, scoped improvements, testing and delivery.
+Keep coherent commits for:
+
+1. Patched image-processing, certificate and frontend build dependencies.
+2. Bounded anonymous workspace admission, request-body limits, native parser subprocesses
+   and safe error responses.
+3. Correct reviewed ERP verification, original-page evidence and worker recovery.
+4. Race-safe workspace navigation, complete review queues and extraction comparison.
+5. A static launch page that waits for live readiness and offers the labeled preview.
+
+Verify with Python and browser regressions, frontend tests/builds, dependency audits,
+fresh migrations and a local synthetic workflow. Publish the tested changes and
+verify deployment health under the owner's current authorization. Existing free
+hosting sleep and database expiry are explicit limitations; do not add paid services.

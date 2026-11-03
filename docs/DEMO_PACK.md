@@ -10,7 +10,8 @@ in the **LOCAL AI WORKSPACE**; do not confuse it with the offline fixture button
 
 These are evaluation documents, not customer records. Synthetic source documents
 go through the real model when uploaded with `PROVIDER=gemini`. The console's
-three built-in sample buttons remain explicitly labeled **offline fixtures**.
+four built-in sample buttons remain explicitly labeled **offline fixtures**. The fourth
+is HelixPoint: 18 lines across two pages, with a deliberate $125 total discrepancy.
 
 ## Rebuild locally
 
