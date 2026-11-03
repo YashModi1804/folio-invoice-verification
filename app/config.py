@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     embedded_worker: bool = False
     public_demo: bool = False
     guest_enabled: bool = False
+    guest_sessions_per_hour: int = Field(default=60, ge=1)
+    guest_sessions_per_day: int = Field(default=250, ge=1)
+    guest_workspace_limit: int = Field(default=2000, ge=1)
     guest_upload_retention_minutes: int = 120
     guest_uploads_per_guest_day: int = 2
     guest_uploads_per_day: int = 20
@@ -35,7 +38,14 @@ class Settings(BaseSettings):
     gemini_thinking_level: Literal["", "minimal", "low", "medium", "high"] = ""
     local_fallback_enabled: bool = False
     max_file_bytes: int = 20 * 1024 * 1024
+    max_request_body_bytes: int = Field(default=1024 * 1024, ge=1024)
     max_pages: int = 20
+    parser_timeout_seconds: int = Field(default=15, ge=1, le=60)
+    parser_cpu_seconds: int = Field(default=10, ge=1, le=30)
+    parser_memory_mb: int = Field(default=256, ge=128, le=320)
+    parser_max_output_bytes: int = Field(
+        default=16 * 1024 * 1024, ge=1024 * 1024, le=32 * 1024 * 1024
+    )
     retention_days: int = 7
     confidence_threshold: float = 0.85
     provider_timeout_seconds: int = 90

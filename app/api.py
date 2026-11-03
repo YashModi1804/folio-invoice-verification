@@ -9,10 +9,11 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
 from fastapi.responses import Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from starlette.concurrency import run_in_threadpool
 
+from app.admission import admit_guest_session, check_guest_allowance, lock_guest_mutation
 from app.config import settings
 from app.db import AuditEvent, GuestSession, GuestUploadUsage, Job, Session, now, timestamp
 from app.domain.routing import route
@@ -33,9 +34,15 @@ class Access:
 def authenticate(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
 ) -> Access:
-    if not credentials:
+    if (
+        not credentials
+        or not credentials.credentials.isascii()
+        or not 1 <= len(credentials.credentials) <= 512
+    ):
         raise HTTPException(401, "Authentication required")
-    if secrets.compare_digest(credentials.credentials, settings.operator_token.get_secret_value()):
+    if secrets.compare_digest(
+        credentials.credentials.encode(), settings.operator_token.get_secret_value().encode()
+    ):
         return Access("operator", settings.operator_name)
     if settings.guest_enabled:
         token_hash = hashlib.sha256(credentials.credentials.encode()).hexdigest()
@@ -106,6 +113,7 @@ def create_guest_session():
         raise HTTPException(404, "Guest access is unavailable")
     token = secrets.token_urlsafe(48)
     with Session.begin() as db:
+        admit_guest_session(db)
         guest = GuestSession(token_hash=hashlib.sha256(token.encode()).hexdigest())
         db.add(guest)
         db.flush()
@@ -169,63 +177,41 @@ def enqueue(data: bytes, filename: str, key: str, access: Access, sample: str | 
         hashlib.sha256(f"{access.workspace_id}:{key}".encode()).hexdigest() if access.guest else key
     )
     checksum = hashlib.sha256(data).hexdigest()
-    with Session() as db:
+    with Session.begin() as db:
+        if access.guest:
+            lock_guest_mutation(db)
         existing = db.scalar(select(Job).where(Job.idempotency_key == scoped_key))
         if existing:
             get_job(db, existing.id, access)
             if existing.checksum != checksum or existing.sample != sample:
                 raise HTTPException(409, "Idempotency key already used for another document")
             return serialize(existing)
+        if access.guest:
+            check_guest_allowance(db, access.workspace_id, sample=sample is not None)
     try:
         media_type, pages = inspect(data, filename)
     except DocumentError as exc:
-        raise HTTPException(422, str(exc)) from exc
+        raise document_http_error(exc) from exc
     if access.guest and pages > settings.guest_max_pages:
         raise HTTPException(422, "Guest page limit exceeded")
     job_id = str(uuid4())
     try:
         with Session.begin() as db:
+            if access.guest:
+                lock_guest_mutation(db)
+                # A concurrent retry may have completed while this request waited for the lock.
+                existing = db.scalar(select(Job).where(Job.idempotency_key == scoped_key))
+                if existing:
+                    get_job(db, existing.id, access)
+                    if existing.checksum != checksum or existing.sample != sample:
+                        raise HTTPException(
+                            409, "Idempotency key already used for another document"
+                        )
+                    return serialize(existing)
+            if access.guest:
+                check_guest_allowance(db, access.workspace_id, sample=sample is not None)
             if access.guest and not sample:
-                if db.bind.dialect.name == "postgresql":
-                    db.execute(text("SELECT pg_advisory_xact_lock(188734091)"))
-                day_ago = now() - timedelta(days=1)
-                daily = db.scalar(
-                    select(func.count())
-                    .select_from(GuestUploadUsage)
-                    .where(GuestUploadUsage.created_at >= day_ago)
-                )
-                guest_daily = db.scalar(
-                    select(func.count())
-                    .select_from(GuestUploadUsage)
-                    .where(
-                        GuestUploadUsage.guest_id == access.workspace_id,
-                        GuestUploadUsage.created_at >= day_ago,
-                    )
-                )
-                pending = db.scalar(
-                    select(func.count())
-                    .select_from(Job)
-                    .where(
-                        Job.workspace_id != "operator",
-                        Job.sample.is_(None),
-                        Job.status.in_(("QUEUED", "PROCESSING")),
-                        Job.created_at
-                        > now() - timedelta(minutes=settings.guest_upload_retention_minutes),
-                    )
-                )
-                if daily >= settings.guest_uploads_per_day or pending >= settings.guest_queue_limit:
-                    raise HTTPException(429, "Live demo capacity reached; try again later")
-                if guest_daily >= settings.guest_uploads_per_guest_day:
-                    raise HTTPException(429, "Guest daily upload allowance reached")
                 db.add(GuestUploadUsage(guest_id=access.workspace_id))
-            if access.guest and sample:
-                sample_count = db.scalar(
-                    select(func.count())
-                    .select_from(Job)
-                    .where(Job.workspace_id == access.workspace_id, Job.sample.is_not(None))
-                )
-                if sample_count >= 8:
-                    raise HTTPException(429, "Guest sample allowance ended")
             job = Job(
                 id=job_id,
                 workspace_id=access.workspace_id,
@@ -340,5 +326,14 @@ def page_image(job_id: str, page_number: int, access: CurrentAccess):
             source = sample_pdf(job.sample)
         if source is None:
             raise HTTPException(410, "Source document retention period ended")
-        pages = render(source, job.media_type, page_numbers=(page_number,))
+        try:
+            pages = render(source, job.media_type, page_numbers=(page_number,))
+        except DocumentError as exc:
+            raise document_http_error(exc) from exc
         return Response(pages[0], media_type="image/png", headers={"Cache-Control": "no-store"})
+
+
+def document_http_error(error: DocumentError) -> HTTPException:
+    if str(error) == "PARSER_BUSY":
+        return HTTPException(503, "PARSER_BUSY", headers={"Retry-After": "2"})
+    return HTTPException(422, str(error))

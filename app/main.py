@@ -4,9 +4,8 @@ import time
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
-from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +16,7 @@ from app import integrations, review  # noqa: F401 — registers integration and
 from app.api import CurrentAccess, guest_router, router, visible_jobs
 from app.config import settings
 from app.db import Job, Session, WorkerHeartbeat, engine, now
+from app.security import RequestGuard
 
 
 @asynccontextmanager
@@ -39,40 +39,7 @@ async def lifespan(_app):
 
 
 app = FastAPI(title="Folio · Document verification", version="0.1.0", lifespan=lifespan)
-
-
-@app.middleware("http")
-async def request_context(request: Request, call_next):
-    correlation_id = str(uuid4())
-    request.state.correlation_id = correlation_id
-    # Bound multipart requests before the framework buffers them on disk.
-    length = request.headers.get("content-length")
-    if request.method == "POST" and request.url.path == "/api/v1/documents" and not length:
-        response = JSONResponse(
-            {"detail": "Content-Length required", "correlation_id": correlation_id}, status_code=411
-        )
-    elif length and (not length.isdigit() or int(length) > settings.max_file_bytes + 65536):
-        response = JSONResponse(
-            {"detail": "FILE_SIZE_LIMIT", "correlation_id": correlation_id}, status_code=413
-        )
-    else:
-        response = await call_next(request)
-    response.headers["X-Correlation-ID"] = correlation_id
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["Referrer-Policy"] = "no-referrer"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
-        response.headers["Strict-Transport-Security"] = "max-age=31536000"
-    if not request.url.path.startswith(("/docs", "/redoc", "/openapi.json")):
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; "
-            "script-src 'self'; style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; form-action 'self'"
-        )
-    if request.url.path.startswith("/api/"):
-        response.headers["Cache-Control"] = "no-store"
-    return response
+app.add_middleware(RequestGuard)
 
 
 @app.exception_handler(HTTPException)
@@ -80,6 +47,7 @@ async def http_error(request, exc):
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail, "correlation_id": request.state.correlation_id},
+        headers=exc.headers,
     )
 
 
@@ -122,6 +90,19 @@ def readiness():
         return JSONResponse(body, status_code=200 if heartbeat and storage_ok else 503)
     except Exception:
         return JSONResponse({"database": "unavailable"}, status_code=503)
+
+
+@app.get("/health/launch", include_in_schema=False)
+def launch_readiness():
+    ready = readiness().status_code == 200
+    return JSONResponse(
+        {"status": "ready" if ready else "starting"},
+        status_code=200 if ready else 503,
+        headers={
+            "Access-Control-Allow-Origin": "https://yashmodi1804.github.io",
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.get("/metrics")

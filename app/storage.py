@@ -1,14 +1,11 @@
-from io import BytesIO
 from pathlib import Path
 
-import pymupdf
-from PIL import Image, UnidentifiedImageError
 from sqlalchemy import select
 
 from app.config import settings
 from app.db import DocumentSource
+from app.parser import DocumentError, parse
 
-Image.MAX_IMAGE_PIXELS = 25_000_000
 EXTENSIONS = {
     ".pdf": "application/pdf",
     ".png": "image/png",
@@ -18,48 +15,13 @@ EXTENSIONS = {
 }
 
 
-class DocumentError(ValueError):
-    pass
-
-
 def inspect(data: bytes, filename: str) -> tuple[str, int]:
     if not data or len(data) > settings.max_file_bytes:
         raise DocumentError("FILE_SIZE_LIMIT")
     expected = EXTENSIONS.get(Path(filename).suffix.lower())
     if expected is None:
         raise DocumentError("UNSUPPORTED_FILE_TYPE")
-    try:
-        if data.startswith(b"%PDF-"):
-            with pymupdf.open(stream=data, filetype="pdf") as doc:
-                if doc.needs_pass:
-                    raise DocumentError("PASSWORD_PROTECTED_PDF")
-                if not 1 <= len(doc) <= settings.max_pages:
-                    raise DocumentError("PAGE_LIMIT")
-                for page in doc:
-                    if page.rect.width * page.rect.height * 4 > 25_000_000:
-                        raise DocumentError("PAGE_DIMENSIONS_LIMIT")
-                actual, pages = "application/pdf", len(doc)
-        else:
-            with Image.open(BytesIO(data)) as image:
-                actual, pages = Image.MIME.get(image.format), 1
-                if image.width * image.height > Image.MAX_IMAGE_PIXELS:
-                    raise DocumentError("IMAGE_DIMENSIONS_LIMIT")
-                if getattr(image, "n_frames", 1) != 1:
-                    raise DocumentError("ANIMATED_IMAGE_UNSUPPORTED")
-                image.verify()
-        if actual != expected:
-            raise DocumentError("CONTENT_TYPE_MISMATCH")
-        return actual, pages
-    except DocumentError:
-        raise
-    except (
-        RuntimeError,
-        ValueError,
-        OSError,
-        UnidentifiedImageError,
-        Image.DecompressionBombError,
-    ) as exc:
-        raise DocumentError("CORRUPT_DOCUMENT") from exc
+    return parse(data, "inspect", media_type=expected)
 
 
 def document_path(job_id: str) -> Path:
@@ -109,27 +71,9 @@ def delete_source(db, job_id: str) -> bool:
 def render(
     data: bytes, media_type: str, page_numbers: tuple[int, ...] | None = None
 ) -> list[bytes]:
-    if media_type == "application/pdf":
-        with pymupdf.open(stream=data, filetype="pdf") as doc:
-            selected = page_numbers or tuple(range(1, len(doc) + 1))
-            return [
-                doc[page_number - 1]
-                .get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), alpha=False)
-                .tobytes("png")
-                for page_number in selected
-            ]
-    if page_numbers and page_numbers != (1,):
-        raise DocumentError("PAGE_NOT_FOUND")
-    with Image.open(BytesIO(data)) as image:
-        image.thumbnail((2400, 2400))
-        output = BytesIO()
-        image.convert("RGB").save(output, format="PNG")
-        return [output.getvalue()]
+    return parse(data, "render", media_type=media_type, page_numbers=page_numbers)
 
 
 def page_texts(data: bytes, media_type: str) -> list[str]:
     """Return native PDF text for local planning; never use it as trusted extraction data."""
-    if media_type != "application/pdf":
-        return [""]
-    with pymupdf.open(stream=data, filetype="pdf") as doc:
-        return [page.get_text() for page in doc]
+    return parse(data, "text", media_type=media_type)
