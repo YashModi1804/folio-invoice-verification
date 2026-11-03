@@ -12,7 +12,7 @@ from app.domain.models import Invoice
 from app.gemini import PROMPT, output_schema
 from app.providers import Extraction, ProviderError
 
-GROQ_PROMPT_VERSION = "invoice-v1-groq-v1"
+GROQ_PROMPT_VERSION = "invoice-v1-groq-v2"
 VISION_PAGE_LIMITS = {"qwen/qwen3.6-27b": 5, "qwen/qwen3.8-27b": 3}
 
 

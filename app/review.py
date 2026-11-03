@@ -29,7 +29,9 @@ def decide(job_id: str, decision: Decision, access: CurrentAccess):
             raise HTTPException(409, "This review is already resolved or unavailable")
         original = Invoice.model_validate(job.result["invoice"])
         corrected = decision.corrected_invoice or original
-        checks = verify(corrected)
+        page_plan = job.result.get("telemetry", {}).get("page_plan", {})
+        # A decision does not prove that omitted source pages were fully transcribed.
+        checks = verify(corrected, line_items_complete=not page_plan.get("skipped_pages"))
         # Explicit human acceptance is permitted even if the source invoice itself is wrong.
         # Preserve remaining warnings and the required note in the decision record.
         status = "HUMAN_APPROVED" if decision.action == "approve" else "REJECTED"

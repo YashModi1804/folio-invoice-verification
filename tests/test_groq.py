@@ -176,3 +176,80 @@ def test_groq_defers_a_job_before_provider_call_when_token_budget_is_reserved(cl
     assert deferred["not_before"] is not None
     audit = client.get(f"/api/v1/jobs/{second['job_id']}/audit").json()
     assert audit[-1]["event"] == "PROVIDER_CAPACITY_DEFERRED"
+
+
+@pytest.mark.parametrize("fallback", [False, True])
+def test_partial_page_evidence_maps_to_source_and_review_keeps_coverage(
+    client, monkeypatch, fallback
+):
+    import pymupdf
+
+    from app import worker
+    from app.ollama import OllamaProvider
+    from app.providers import Extraction
+
+    monkeypatch.setattr(settings, "provider", "groq")
+    monkeypatch.setattr(settings, "groq_tokens_per_minute", 6_696)
+    monkeypatch.setattr(settings, "local_fallback_enabled", fallback)
+    extracted = sample_invoice("clean")
+    assert extracted.total_amount.evidence[0].page_number == 2
+
+    def cloud(*args):
+        if fallback:
+            raise ProviderError("PROVIDER_UNAVAILABLE")
+        return Extraction(extracted, "groq", "test")
+
+    monkeypatch.setattr(GroqProvider, "extract", cloud)
+    monkeypatch.setattr(
+        OllamaProvider, "extract", lambda *a: Extraction(extracted, "ollama", "test-local")
+    )
+    with pymupdf.open() as doc:
+        for _ in range(4):
+            doc.new_page()
+        data = doc.tobytes()
+    job_id = client.post(
+        "/api/v1/documents",
+        files={"file": ("four.pdf", data)},
+        headers={"Idempotency-Key": "page-evidence"},
+    ).json()["job_id"]
+    assert worker.run_once()
+    job = client.get(f"/api/v1/jobs/{job_id}").json()
+    assert job["result"]["telemetry"]["page_plan"]["selected_pages"] == [1, 4]
+    assert job["result"]["invoice"]["total_amount"]["evidence"][0]["page_number"] == 4
+    assert extracted.total_amount.evidence[0].page_number == 2
+    assert (
+        client.post(
+            f"/api/v1/review-tasks/{job_id}/decision",
+            json={"action": "approve", "note": "Accepting incomplete source coverage explicitly"},
+        ).status_code
+        == 200
+    )
+    decision = client.get(f"/api/v1/jobs/{job_id}/decision").json()
+    assert (
+        next(c for c in decision["checks"] if c["code"] == "SUBTOTAL")["state"] == "NOT_APPLICABLE"
+    )
+    export = client.get(f"/api/v1/jobs/{job_id}/erp-export").json()
+    assert export["verification"]["math_validated"] is None
+
+
+@pytest.mark.parametrize("token_limit,image_tokens", [(4_000, 2_048), (8_000, 0)])
+def test_impossible_capacity_fails_before_provider_instead_of_deferring_forever(
+    client, monkeypatch, token_limit, image_tokens
+):
+    from app import worker
+
+    monkeypatch.setattr(settings, "provider", "groq")
+    monkeypatch.setattr(settings, "groq_tokens_per_minute", token_limit)
+    monkeypatch.setattr(settings, "groq_image_tokens", image_tokens)
+    monkeypatch.setattr(GroqProvider, "extract", lambda *a: pytest.fail("Unexpected provider call"))
+    job_id = client.post(
+        "/api/v1/documents",
+        files={"file": ("two.pdf", sample_pdf("clean"))},
+        headers={"Idempotency-Key": "invalid-capacity"},
+    ).json()["job_id"]
+    assert worker.run_once()
+    saved = client.get(f"/api/v1/jobs/{job_id}").json()
+    assert saved["status"] == "FAILED"
+    assert saved["error"] == "PROVIDER_CAPACITY_CONFIGURATION"
+    assert saved["not_before"] is None
+    assert not worker.run_once()

@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from app.domain.models import ExtractedField, Invoice
+
 
 @dataclass(frozen=True)
 class PagePlan:
@@ -9,6 +11,27 @@ class PagePlan:
     skipped_pages: tuple[int, ...]
     roles: tuple[str, ...]
     estimated_tokens: int
+
+
+def remap_evidence_pages(
+    invoice: Invoice, selected_pages: tuple[int, ...]
+) -> tuple[Invoice, list[dict[str, str | int]]]:
+    """Convert supplied-image positions into original source-page references."""
+    mapped = invoice.model_copy(deep=True)
+    invalid = []
+    for name in Invoice.model_fields:
+        field = getattr(mapped, name)
+        if not isinstance(field, ExtractedField):
+            continue
+        evidence = []
+        for reference in field.evidence:
+            if reference.page_number > len(selected_pages):
+                invalid.append({"field": name, "image_position": reference.page_number})
+                continue
+            reference.page_number = selected_pages[reference.page_number - 1]
+            evidence.append(reference)
+        field.evidence = evidence
+    return mapped, invalid
 
 
 def classify_page(text: str, page_number: int, page_count: int) -> str:

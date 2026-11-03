@@ -3,6 +3,7 @@ from datetime import timedelta
 import pymupdf
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 
 from app import api, retention, worker
 from app.config import settings
@@ -154,3 +155,28 @@ def test_idempotency_leaves_only_one_stored_record(client):
         )
     with api.Session() as db:
         assert len(db.scalars(select(Job)).all()) == 1
+
+
+def test_worker_recovers_after_transient_database_disconnect(client, monkeypatch, caplog):
+    attempts = []
+    delays = []
+
+    def run_once():
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise OperationalError("SELECT 1", {}, RuntimeError("private connection details"))
+        if len(attempts) == 2:
+            return False
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(worker, "configure_logging", lambda: None)
+    monkeypatch.setattr(worker, "run_once", run_once)
+    monkeypatch.setattr(worker.time, "sleep", delays.append)
+    monkeypatch.setattr(retention, "expire_guest_uploads", lambda: 0)
+    monkeypatch.setattr(retention, "expire_sources", lambda **kwargs: [])
+    with pytest.raises(KeyboardInterrupt):
+        worker.main()
+    assert len(attempts) == 3
+    assert delays == [2, 0.75]
+    assert "worker_database_unavailable" in caplog.text
+    assert "private connection details" not in caplog.text

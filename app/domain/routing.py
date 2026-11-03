@@ -20,9 +20,10 @@ def route(
     threshold: float = 0.85,
     page_count: int = 20,
     complete_page_coverage: bool = True,
+    invalid_evidence_reference: bool = False,
 ) -> tuple[str, list[str]]:
     reasons = []
-    has_invalid_evidence_reference = False
+    has_invalid_evidence_reference = invalid_evidence_reference
     for name in CORE_FIELDS:
         field = getattr(invoice, name)
         if field.value is None or (isinstance(field.value, str) and not field.value.strip()):

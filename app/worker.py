@@ -5,13 +5,14 @@ import time
 from datetime import timedelta
 
 from sqlalchemy import or_, select, update
+from sqlalchemy.exc import OperationalError, TimeoutError
 
 from app.config import settings
 from app.db import AuditEvent, Job, Session, WorkerHeartbeat, new_id, now, timestamp
 from app.domain.capacity import RESERVATION_EVENT, reserve_or_defer
-from app.domain.page_plan import make_plan
+from app.domain.page_plan import make_plan, remap_evidence_pages
 from app.domain.routing import route
-from app.domain.verify import verify
+from app.domain.verify import math_validated, verify
 from app.gemini import PROMPT_VERSION, GeminiProvider
 from app.groq import GROQ_PROMPT_VERSION, VISION_PAGE_LIMITS, GroqProvider
 from app.logging import configure_logging
@@ -88,7 +89,9 @@ def groq_page_plan(data: bytes, media_type: str):
     base_tokens = settings.groq_request_overhead_tokens + settings.groq_output_reserve_tokens
     available_for_images = settings.groq_tokens_per_minute - base_tokens
     model_limit = VISION_PAGE_LIMITS.get(settings.groq_model, 1)
-    max_pages = min(model_limit, max(1, available_for_images // settings.groq_image_tokens))
+    if settings.groq_image_tokens <= 0 or available_for_images < settings.groq_image_tokens:
+        raise ProviderError("PROVIDER_CAPACITY_CONFIGURATION")
+    max_pages = min(model_limit, available_for_images // settings.groq_image_tokens)
     return make_plan(
         page_texts(data, media_type),
         max_pages_per_request=max_pages,
@@ -227,6 +230,14 @@ def run_once() -> bool:
                 else GeminiProvider()
             )
             extraction = extract_with_fallback(job, pages, provider)
+            invalid_references = []
+            if plan:
+                extraction.invoice, invalid_references = remap_evidence_pages(
+                    extraction.invoice, plan.selected_pages
+                )
+                page_plan_details["evidence_numbering"] = "source-page"
+                if invalid_references:
+                    page_plan_details["invalid_evidence_references"] = invalid_references
             checks = verify(
                 extraction.invoice,
                 line_items_complete=not plan or not plan.skipped_pages,
@@ -237,16 +248,13 @@ def run_once() -> bool:
                 settings.confidence_threshold,
                 job.page_count,
                 complete_page_coverage=not plan or not plan.skipped_pages,
+                invalid_evidence_reference=bool(invalid_references),
             )
             result = {
                 "invoice": extraction.invoice.model_dump(mode="json"),
                 "checks": [c.model_dump(mode="json") for c in checks],
                 "route_reasons": reasons,
-                "math_validated": False
-                if any(c.state == "FAIL" for c in checks)
-                else None
-                if any(c.state == "NOT_APPLICABLE" for c in checks)
-                else True,
+                "math_validated": math_validated(checks),
                 "telemetry": {
                     **extraction.usage,
                     "provider": extraction.provider,
@@ -256,6 +264,8 @@ def run_once() -> bool:
                     if extraction.provider == "ollama"
                     else GROQ_PROMPT_VERSION
                     if extraction.provider == "groq"
+                    else "fixture-v1"
+                    if extraction.provider == "fixture"
                     else PROMPT_VERSION,
                     "latency_ms": round((time.monotonic() - start) * 1000),
                     "planning_ms": planning_ms,
@@ -299,7 +309,13 @@ def run_once() -> bool:
         code = str(exc) if isinstance(exc, (ProviderError, DocumentError)) else "PROCESSING_FAILED"
         with Session.begin() as db:
             job = db.get(Job, job_id)
-            if job.status == "PROCESSING":
+            if job and job.status == "PROCESSING" and code == "PARSER_BUSY":
+                job.status, job.started_at = "QUEUED", None
+                job.not_before = now() + timedelta(seconds=2)
+                db.add(AuditEvent(job_id=job_id, event="PARSER_CAPACITY_DEFERRED", actor="worker"))
+                logger.info("job_deferred_for_parser_capacity", extra={"job_id": job_id})
+                return True
+            if job and job.status == "PROCESSING":
                 job.status, job.error, job.completed_at = "FAILED", code, now()
                 db.add(
                     AuditEvent(
@@ -328,9 +344,18 @@ def main():
                         logger.info("expired_source_documents", extra={"count": len(expired)})
                     last_source_cleanup = time.monotonic()
             except Exception:
-                logger.exception("source_retention_failed")
+                # Keep exception objects out of handlers that may include SQL parameters.
+                logger.error("source_retention_failed")
             last_guest_cleanup = time.monotonic()
-        if not run_once():
+        try:
+            worked = run_once()
+        except (OperationalError, TimeoutError):
+            # A transient database disconnect must not kill the embedded worker.
+            # Readiness stays unavailable until a new heartbeat is committed.
+            logger.error("worker_database_unavailable")
+            time.sleep(2)
+            continue
+        if not worked:
             time.sleep(0.75)
 
 

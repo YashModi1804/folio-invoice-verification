@@ -11,7 +11,7 @@ from app.domain.models import Invoice
 from app.gemini import PROMPT, output_schema
 from app.providers import Extraction, ProviderError
 
-LOCAL_PROMPT_VERSION = "invoice-v1-ollama-v2"
+LOCAL_PROMPT_VERSION = "invoice-v1-ollama-v3"
 
 
 class OllamaProvider:

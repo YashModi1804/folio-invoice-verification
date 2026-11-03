@@ -6,6 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 T = TypeVar("T")
 Money = Annotated[Decimal, Field(allow_inf_nan=False, max_digits=16, decimal_places=4)]
+# Up to 500 bounded line products can exceed the precision of any printed amount.
+CalculatedMoney = Annotated[Decimal, Field(allow_inf_nan=False, max_digits=32, decimal_places=4)]
 
 
 class Contract(BaseModel):
@@ -49,9 +51,9 @@ class Invoice(Contract):
 class Check(Contract):
     code: str
     state: Literal["PASS", "FAIL", "NOT_APPLICABLE"]
-    expected: Money | None = None
-    observed: Money | None = None
-    variance: Money | None = None
+    expected: CalculatedMoney | None = None
+    observed: CalculatedMoney | None = None
+    variance: CalculatedMoney | None = None
     tolerance: Money = Decimal("0.01")
 
 

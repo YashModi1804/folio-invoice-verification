@@ -5,7 +5,8 @@ from sqlalchemy import select
 
 from app.api import CurrentAccess, get_job, router
 from app.db import AuditEvent, ReviewDecision, Session, timestamp
-from app.domain.models import ERPExportAcknowledgement
+from app.domain.models import Check, ERPExportAcknowledgement
+from app.domain.verify import math_validated
 
 APPROVED_STATUSES = {"AUTO_APPROVED", "HUMAN_APPROVED"}
 EXPORT_SCHEMA_VERSION = "folio.erp-export.v1"
@@ -17,6 +18,7 @@ def approved_export(job, decision: ReviewDecision | None) -> dict:
     result = job.result or {}
     invoice = decision.corrected_invoice if decision else result["invoice"]
     checks = decision.checks if decision else result["checks"]
+    approved_at = decision.created_at if decision else job.completed_at
 
     def value(field: str):
         return invoice[field]["value"]
@@ -29,7 +31,7 @@ def approved_export(job, decision: ReviewDecision | None) -> dict:
             "job_id": job.id,
             "correlation_id": job.correlation_id,
             "status": job.status,
-            "approved_at": timestamp(job.completed_at),
+            "approved_at": timestamp(approved_at),
         },
         "invoice": {
             "supplier": {"name": value("vendor_name"), "tax_id": value("vendor_tax_id")},
@@ -47,7 +49,7 @@ def approved_export(job, decision: ReviewDecision | None) -> dict:
         },
         "verification": {
             "checks": checks,
-            "math_validated": result.get("math_validated"),
+            "math_validated": math_validated([Check.model_validate(check) for check in checks]),
             "reviewed_by": decision.actor if decision else None,
         },
     }

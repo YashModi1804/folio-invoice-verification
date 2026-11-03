@@ -78,6 +78,40 @@ def test_erp_export_is_approved_only_and_idempotently_acknowledged(client):
     assert [item["event"] for item in audit].count("ERP_EXPORT_ACKNOWLEDGED") == 1
 
 
+@pytest.mark.parametrize(
+    "sample,total,expected_math",
+    [("variance", "1250.00", True), ("uncertain", "1300.00", False)],
+)
+def test_erp_export_uses_reviewed_checks_and_approval_time(client, sample, total, expected_math):
+    from datetime import timedelta
+
+    from app import api
+    from app.db import Job, now
+
+    job = processed(client, sample)
+    with api.Session.begin() as db:
+        db.get(Job, job["job_id"]).completed_at = now() - timedelta(days=1)
+    corrected = job["result"]["invoice"]
+    corrected["total_amount"]["value"] = total
+    assert (
+        client.post(
+            f"/api/v1/review-tasks/{job['job_id']}/decision",
+            json={
+                "action": "approve",
+                "note": "Reviewed the invoice and accepted this amount",
+                "corrected_invoice": corrected,
+            },
+        ).status_code
+        == 200
+    )
+    decision = client.get(f"/api/v1/jobs/{job['job_id']}/decision").json()
+    export = client.get(f"/api/v1/jobs/{job['job_id']}/erp-export").json()
+    assert export["verification"]["math_validated"] is expected_math
+    assert export["folio"]["approved_at"] == decision["created_at"]
+    saved = client.get(f"/api/v1/jobs/{job['job_id']}").json()
+    assert saved["result"]["math_validated"] is not expected_math
+
+
 def test_idempotent_upload_and_conflict(client):
     data = sample_pdf("clean")
 
