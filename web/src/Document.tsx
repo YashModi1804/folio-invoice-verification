@@ -5,11 +5,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  ExternalLink,
   Loader2,
   ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
 import { pageUrl, request } from "./api";
+import { parserErrorMessage } from "./http";
 import {
   humanize,
   labels,
@@ -22,6 +24,7 @@ import {
 } from "./types";
 import Review from "./Review";
 import { PUBLIC_PREVIEW } from "./preview";
+import { fieldWasCorrected, validEvidence } from "./workspace";
 
 const fieldNames = [
   "vendor_name",
@@ -36,7 +39,11 @@ const fieldNames = [
   "total_amount",
 ] as const;
 
-function describeRouteReason(reason: string, failedTotal?: Check, currency?: string | null) {
+function describeRouteReason(
+  reason: string,
+  failedTotal?: Check,
+  currency?: string | null,
+) {
   if (reason === "TOTAL_FAIL" && failedTotal) {
     return `Printed total ${failedTotal.observed}; calculated total ${failedTotal.expected}. Difference: ${currency ?? ""} ${failedTotal.variance}.`;
   }
@@ -49,37 +56,57 @@ function describeRouteReason(reason: string, failedTotal?: Check, currency?: str
   return humanize(reason);
 }
 
-function reviewSummary(reasons: string[], failedTotal?: Check, currency?: string | null) {
+function reviewSummary(
+  reasons: string[],
+  failedTotal?: Check,
+  currency?: string | null,
+) {
   const summary: string[] = [];
   if (reasons.includes("TOTAL_FAIL") && failedTotal) {
     summary.push(describeRouteReason("TOTAL_FAIL", failedTotal, currency));
   }
   if (reasons.some((reason) => reason.endsWith("_NOT_APPLICABLE"))) {
-    summary.push("The document does not provide enough detail to reconcile all printed amounts.");
+    summary.push(
+      "The document does not provide enough detail to reconcile all printed amounts.",
+    );
   }
-  const unstated = ["TAX_AMOUNT", "SHIPPING_AMOUNT", "DISCOUNT_AMOUNT"].filter((field) =>
-    reasons.includes(`MISSING_${field}`),
+  const unstated = ["TAX_AMOUNT", "SHIPPING_AMOUNT", "DISCOUNT_AMOUNT"].filter(
+    (field) => reasons.includes(`MISSING_${field}`),
   );
   if (unstated.length) {
-    summary.push(`Not stated on the document: ${unstated.map(humanize).join(", ")}.`);
+    summary.push(
+      `Not stated on the document: ${unstated.map(humanize).join(", ")}.`,
+    );
   }
   const missingCore = reasons
     .filter((reason) => reason.startsWith("MISSING_"))
     .map((reason) => reason.slice(8))
-    .filter((field) => !["TAX_AMOUNT", "SHIPPING_AMOUNT", "DISCOUNT_AMOUNT"].includes(field));
+    .filter(
+      (field) =>
+        !["TAX_AMOUNT", "SHIPPING_AMOUNT", "DISCOUNT_AMOUNT"].includes(field),
+    );
   if (missingCore.length) {
-    summary.push(`Required details need confirmation: ${missingCore.map(humanize).join(", ")}.`);
+    summary.push(
+      `Required details need confirmation: ${missingCore.map(humanize).join(", ")}.`,
+    );
   }
   if (reasons.includes("INVALID_EVIDENCE_PAGE_REFERENCE")) {
-    summary.push("Some source citations cannot be opened and need a quick check.");
+    summary.push(
+      "Some source citations cannot be opened and need a quick check.",
+    );
   }
-  return summary.length ? summary : ["This record needs a human decision before approval."];
+  return summary.length
+    ? summary
+    : ["This record needs a human decision before approval."];
 }
 
 function traceValue(key: string, value: unknown): string {
   if (value === null || value === undefined) return "Not available";
   if (key === "page_plan" && typeof value === "object") {
-    const plan = value as { selected_pages?: number[]; skipped_pages?: number[] };
+    const plan = value as {
+      selected_pages?: number[];
+      skipped_pages?: number[];
+    };
     const selected = plan.selected_pages?.join(", ") || "none";
     const skipped = plan.skipped_pages?.join(", ") || "none";
     return `Selected pages ${selected}; skipped pages ${skipped}`;
@@ -142,15 +169,20 @@ export default function Document({
   job: Job;
   token: string;
   back: () => void;
-  refresh: () => void;
+  refresh: () => Promise<void>;
   onError: (message: string) => void;
 }) {
   const [page, setPage] = useState(1);
   const [image, setImage] = useState("");
   const [imageError, setImageError] = useState("");
+  const [sourceAttempt, setSourceAttempt] = useState(0);
   const [evidence, setEvidence] = useState("");
+  const [originalCitation, setOriginalCitation] = useState(false);
   const [audit, setAudit] = useState<Audit[]>([]);
   const [decision, setDecision] = useState<Decision>(null);
+  const [recordView, setRecordView] = useState<"reviewed" | "original">(
+    "reviewed",
+  );
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Invoice | null>(null);
   const pending = ["QUEUED", "PROCESSING"].includes(job.status);
@@ -193,9 +225,10 @@ export default function Document({
   useEffect(() => {
     let active = true;
     let url = "";
+    const controller = new AbortController();
     setImage("");
     setImageError("");
-    pageUrl(job.job_id, page, token)
+    pageUrl(job.job_id, page, token, controller.signal)
       .then((value) => {
         url = value;
         if (active) setImage(value);
@@ -206,9 +239,10 @@ export default function Document({
       });
     return () => {
       active = false;
+      controller.abort();
       if (url.startsWith("blob:")) URL.revokeObjectURL(url);
     };
-  }, [job.job_id, page, token]);
+  }, [job.job_id, page, token, sourceAttempt]);
   useEffect(() => {
     let active = true;
     Promise.all([
@@ -235,13 +269,23 @@ export default function Document({
     (check) => check.code === "TOTAL" && check.state === "FAIL",
   );
   const failed = ["FAILED", "REJECTED"].includes(job.status);
-  const invoice = editing ? draft : (decision?.invoice ?? job.result?.invoice);
-  function showEvidence(field: Field) {
-    const source = field.evidence[0];
+  const showOriginal = Boolean(decision && recordView === "original");
+  const invoice = editing
+    ? draft
+    : showOriginal
+      ? job.result?.invoice
+      : (decision?.invoice ?? job.result?.invoice);
+  function showEvidence(field: Field, fromReview = false) {
+    const source = validEvidence(field, job.page_count);
     if (source) {
       setPage(source.page_number);
       setEvidence(source.text);
+      setOriginalCitation(fromReview);
     }
+  }
+  function navigatePage(next: number) {
+    setPage(Math.min(job.page_count, Math.max(1, next)));
+    setEvidence("");
   }
   function updateLine(
     index: number,
@@ -262,12 +306,16 @@ export default function Document({
     <>
       <button className="ghost back" onClick={back}>
         <ArrowLeft size={15} />
-        All documents
+        Back to documents
       </button>
       <div className="heading">
         <div>
           <div className="eyebrow">Document workspace</div>
-          <h1>{job.summary?.vendor_name ?? "Reading your document"}</h1>
+          <h1>
+            {invoice?.vendor_name.value ??
+              job.summary?.vendor_name ??
+              (pending ? "Reading your document" : job.filename)}
+          </h1>
           <p>
             {job.filename} · {job.page_count} pages ·{" "}
             {job.mode === "fixture"
@@ -312,13 +360,16 @@ export default function Document({
                 ? `Cloud service unavailable. Local AI is processing this document · ${elapsed}s elapsed.`
                 : waitingForCapacity
                   ? `Waiting for provider capacity. Next attempt in about ${capacityWaitSeconds}s; no model request has been made yet.`
-                : `Extracting and independently verifying your document · ${elapsed}s elapsed.`
+                  : `Extracting and independently verifying your document · ${elapsed}s elapsed.`
               : review
                 ? "This record is held for review. Resolve the flagged details before approval."
                 : failed
                   ? job.error === "PROVIDER_RATE_LIMITED"
                     ? "The provider's request quota is exhausted. Retry after it resets. No financial record was approved."
-                    : humanize(job.error ?? "Record rejected by reviewer")
+                    : job.error === "PROVIDER_CAPACITY_CONFIGURATION"
+                      ? "This document needs more provider capacity than this demo can reserve. Try a smaller document or contact the workspace owner. No extraction request was sent."
+                      : (parserErrorMessage(job.error ?? "") ??
+                        humanize(job.error ?? "Record rejected by reviewer"))
                   : "The record is approved. Its original extraction and verification history are preserved."}
           </p>
           {pending && (
@@ -344,7 +395,8 @@ export default function Document({
               </ul>
               <details className="review-trace">
                 <summary>
-                  Technical review trace ({job.result?.route_reasons.length ?? 0} checks)
+                  Technical review trace (
+                  {job.result?.route_reasons.length ?? 0} checks)
                 </summary>
                 <ul className="reason-list">
                   {job.result?.route_reasons.map((reason) => (
@@ -370,8 +422,8 @@ export default function Document({
               <div className="toolbar">
                 <button
                   aria-label="Previous page"
-                  disabled={page === 1}
-                  onClick={() => setPage(page - 1)}
+                  disabled={page <= 1}
+                  onClick={() => navigatePage(page - 1)}
                 >
                   <ChevronLeft size={16} />
                 </button>
@@ -380,20 +432,41 @@ export default function Document({
                 </span>
                 <button
                   aria-label="Next page"
-                  disabled={page === job.page_count}
-                  onClick={() => setPage(page + 1)}
+                  disabled={page >= job.page_count}
+                  onClick={() => navigatePage(page + 1)}
                 >
                   <ChevronRight size={16} />
                 </button>
+                {image && (
+                  <a
+                    className="source-expand"
+                    href={image}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open source page ${page} at full size`}
+                    title="Open full size"
+                  >
+                    <ExternalLink size={16} />
+                  </a>
+                )}
               </div>
             </div>
             {evidence && (
               <div className="evidence">
-                <strong>{PUBLIC_PREVIEW ? "Sample evidence:" : "Model-cited evidence:"}</strong> “{evidence}”<br />
+                <strong>
+                  {originalCitation
+                    ? "Original extraction citation:"
+                    : job.mode === "fixture"
+                      ? "Sample evidence:"
+                      : "Model-cited evidence:"}
+                </strong>{" "}
+                “{evidence}”<br />
                 <span className="muted">
-                  {PUBLIC_PREVIEW
-                    ? "This citation is part of a synthetic fixture, not a live extraction."
-                    : "Check against the source page; citations are not independently verified."}
+                  {originalCitation
+                    ? "This citation belongs to the original extraction. A reviewer may have corrected the displayed value."
+                    : job.mode === "fixture"
+                      ? "This citation is part of a synthetic fixture, not a live extraction."
+                      : "Check against the source page; citations are not independently verified."}
                 </span>
               </div>
             )}
@@ -401,7 +474,18 @@ export default function Document({
               {image ? (
                 <img src={image} alt={`Original invoice, page ${page}`} />
               ) : (
-                <p className="muted">{imageError || "Loading source page…"}</p>
+                <div className="source-message" role="status">
+                  <p className="muted">
+                    {imageError || "Loading source page…"}
+                  </p>
+                  {imageError && (
+                    <button
+                      onClick={() => setSourceAttempt((attempt) => attempt + 1)}
+                    >
+                      Retry source page
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </section>
@@ -442,20 +526,24 @@ export default function Document({
                   <h2>
                     {editing
                       ? "Correct extracted fields"
-                      : decision
-                        ? "Reviewed record"
-                        : PUBLIC_PREVIEW
-                          ? "Sample details"
-                          : "Extracted details"}
+                      : showOriginal
+                        ? "Original extraction"
+                        : decision
+                          ? "Reviewed record"
+                          : PUBLIC_PREVIEW
+                            ? "Sample details"
+                            : "Extracted details"}
                   </h2>
                   <p>
                     {editing
                       ? "Checks below show the original extraction until you save."
-                      : decision
-                        ? PUBLIC_PREVIEW
-                          ? "Preview decision in this tab · original sample retained"
-                          : "Human decision recorded · original retained"
-                        : "Select a confidence label to inspect source evidence"}
+                      : showOriginal
+                        ? "Preserved exactly as extracted, before the review decision"
+                        : decision
+                          ? PUBLIC_PREVIEW
+                            ? "Preview decision in this tab · original sample retained"
+                            : "Human decision recorded · original retained"
+                          : "Select a confidence label to inspect source evidence"}
                   </p>
                 </div>
                 {review && !PUBLIC_PREVIEW && (
@@ -469,42 +557,95 @@ export default function Document({
                   </button>
                 )}
               </div>
+              {decision && (
+                <div
+                  className="record-switch"
+                  role="group"
+                  aria-label="Record version"
+                >
+                  <button
+                    aria-pressed={!showOriginal}
+                    onClick={() => setRecordView("reviewed")}
+                  >
+                    Reviewed record
+                  </button>
+                  <button
+                    aria-pressed={showOriginal}
+                    onClick={() => setRecordView("original")}
+                  >
+                    Original extraction
+                  </button>
+                </div>
+              )}
               <div className="fields">
-                {fieldNames.map((name) => (
-                  <div className="field" key={name}>
-                    <span className="field-label">{humanize(name)}</span>
-                    <div className="field-value">
-                      {editing ? (
-                        <input
-                          aria-label={humanize(name)}
-                          value={invoice[name].value ?? ""}
-                          onChange={(event) =>
-                            setDraft({
-                              ...invoice,
-                              [name]: {
-                                ...invoice[name],
-                                value: event.target.value || null,
-                              },
-                            })
-                          }
-                        />
-                      ) : (
-                        <>
-                          <strong>{invoice[name].value ?? "Not found"}</strong>
-                          <button
-                            onClick={() => showEvidence(invoice[name])}
-                            title="Model confidence, not calibrated probability"
-                            aria-label={`View ${humanize(name)} source evidence`}
-                          >
-                            {decision || invoice[name].value === null
-                              ? "Source"
-                              : `${Math.round(invoice[name].confidence * 100)}%`}
-                          </button>
-                        </>
-                      )}
+                {fieldNames.map((name) => {
+                  const reviewedView = Boolean(decision && !showOriginal);
+                  const sourceField = job.result!.invoice[name];
+                  const corrected =
+                    reviewedView &&
+                    fieldWasCorrected(sourceField, invoice[name]);
+                  return (
+                    <div className="field" key={name}>
+                      <span className="field-label">{humanize(name)}</span>
+                      <div className="field-value">
+                        {editing ? (
+                          <input
+                            aria-label={humanize(name)}
+                            type={name === "invoice_date" ? "date" : "text"}
+                            inputMode={
+                              name.endsWith("amount") || name === "subtotal"
+                                ? "decimal"
+                                : undefined
+                            }
+                            value={invoice[name].value ?? ""}
+                            onChange={(event) =>
+                              setDraft({
+                                ...invoice,
+                                [name]: {
+                                  ...invoice[name],
+                                  value: event.target.value || null,
+                                },
+                              })
+                            }
+                          />
+                        ) : (
+                          <>
+                            <strong>
+                              {invoice[name].value ?? "Not found"}
+                            </strong>
+                            {corrected && (
+                              <span className="reviewed-field">Reviewed</span>
+                            )}
+                            <button
+                              onClick={() =>
+                                showEvidence(sourceField, reviewedView)
+                              }
+                              disabled={
+                                !validEvidence(sourceField, job.page_count)
+                              }
+                              title={
+                                validEvidence(sourceField, job.page_count)
+                                  ? reviewedView
+                                    ? "View the original extraction citation; the reviewed value may differ"
+                                    : "Model confidence, not calibrated probability"
+                                  : "No source citation available for this field"
+                              }
+                              aria-label={`View ${reviewedView ? "original " : ""}${humanize(name)} source evidence`}
+                            >
+                              {!validEvidence(sourceField, job.page_count)
+                                ? "No source"
+                                : reviewedView
+                                  ? "Original source"
+                                  : invoice[name].value === null
+                                    ? "Source"
+                                    : `${Math.round(invoice[name].confidence * 100)}%`}
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="table-scroll">
                 <table>
@@ -532,6 +673,9 @@ export default function Document({
                               <input
                                 className="line-input"
                                 aria-label={`Line ${index + 1} ${humanize(key)}`}
+                                inputMode={
+                                  key === "description" ? undefined : "decimal"
+                                }
                                 value={line[key] ?? ""}
                                 onChange={(e) =>
                                   updateLine(index, key, e.target.value)
@@ -550,18 +694,23 @@ export default function Document({
             </section>
           )}
           {job.result && (
-            <CheckLedger checks={decision?.checks ?? job.result.checks} />
+            <CheckLedger
+              checks={
+                showOriginal
+                  ? job.result.checks
+                  : (decision?.checks ?? job.result.checks)
+              }
+            />
           )}
           {review && (
             <Review
               job={job}
               token={token}
               draft={editing ? draft : null}
-              onDone={() => {
+              onDone={async () => {
                 setEditing(false);
-                refresh();
+                await refresh();
               }}
-              onError={onError}
             />
           )}
           {decision && (

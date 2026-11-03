@@ -1,6 +1,8 @@
 import type { Audit, Check, Decision, Invoice, Job } from "./types";
+import { prioritizeReviews } from "./workspace";
 
-export const PUBLIC_PREVIEW = import.meta.env.VITE_FOLIO_PUBLIC_PREVIEW === "true";
+export const PUBLIC_PREVIEW =
+  import.meta.env.VITE_FOLIO_PUBLIC_PREVIEW === "true";
 
 type Example = { kind: string; job: Job };
 type PreviewState = {
@@ -13,7 +15,11 @@ type PreviewState = {
 
 let previewState: Promise<PreviewState> | undefined;
 
-function event(event: string, actor: string, details: Audit["details"] = {}): Audit {
+function event(
+  event: string,
+  actor: string,
+  details: Audit["details"] = {},
+): Audit {
   return { event, actor, details, created_at: new Date().toISOString() };
 }
 
@@ -41,6 +47,10 @@ async function state(): Promise<PreviewState> {
       );
       const kinds = new Map(items.map(({ kind, job }) => [job.job_id, kind]));
       return { examples, jobs, audits, decisions: new Map(), kinds };
+    })
+    .catch((error) => {
+      previewState = undefined;
+      throw error;
     });
   return previewState;
 }
@@ -51,7 +61,10 @@ function findJob(store: PreviewState, jobId: string): Job {
   return job;
 }
 
-export async function previewRequest<T>(path: string, options: RequestInit): Promise<T> {
+export async function previewRequest<T>(
+  path: string,
+  options: RequestInit,
+): Promise<T> {
   const store = await state();
   const method = options.method ?? "GET";
   if (path === "/config" && method === "GET")
@@ -61,10 +74,16 @@ export async function previewRequest<T>(path: string, options: RequestInit): Pro
       max_pages: 2,
     } as T;
   if (path === "/jobs" && method === "GET") return [...store.jobs] as T;
+  if (path === "/review-tasks" && method === "GET")
+    return prioritizeReviews(store.jobs) as T;
   if (path === "/documents" && method === "POST")
-    throw new Error("This public preview accepts synthetic samples only. Private uploads require the hosted API.");
+    throw new Error(
+      "This public preview accepts synthetic samples only. Private uploads require the hosted API.",
+    );
 
-  const sample = path.match(/^\/samples\/(clean|variance|uncertain|helixpoint)$/);
+  const sample = path.match(
+    /^\/samples\/(clean|variance|uncertain|helixpoint)$/,
+  );
   if (sample && method === "POST") {
     const kind = sample[1];
     const template = store.examples.get(kind);
@@ -86,7 +105,8 @@ export async function previewRequest<T>(path: string, options: RequestInit): Pro
   const audit = path.match(/^\/jobs\/([^/]+)\/audit$/);
   if (audit && method === "GET") return (store.audits.get(audit[1]) ?? []) as T;
   const decision = path.match(/^\/jobs\/([^/]+)\/decision$/);
-  if (decision && method === "GET") return (store.decisions.get(decision[1]) ?? null) as T;
+  if (decision && method === "GET")
+    return (store.decisions.get(decision[1]) ?? null) as T;
   const review = path.match(/^\/review-tasks\/([^/]+)\/decision$/);
   if (review && method === "POST") {
     const job = findJob(store, review[1]);
@@ -100,7 +120,9 @@ export async function previewRequest<T>(path: string, options: RequestInit): Pro
     if (!body.note?.trim() || body.note.trim().length < 3)
       throw new Error("Add a short review note first.");
     if (body.corrected_invoice)
-      throw new Error("Field corrections need the hosted API; this preview records decisions only.");
+      throw new Error(
+        "Field corrections need the hosted API; this preview records decisions only.",
+      );
     job.status = body.action === "approve" ? "HUMAN_APPROVED" : "REJECTED";
     store.decisions.set(job.job_id, {
       action: body.action,
@@ -109,16 +131,21 @@ export async function previewRequest<T>(path: string, options: RequestInit): Pro
       invoice: structuredClone(job.result!.invoice),
       checks: structuredClone(job.result!.checks) as Check[],
     });
-    store.audits.get(job.job_id)?.push(event(job.status, "Preview visitor", {
-      note: body.note.trim(),
-      changes: {},
-    }));
+    store.audits.get(job.job_id)?.push(
+      event(job.status, "Preview visitor", {
+        note: body.note.trim(),
+        changes: {},
+      }),
+    );
     return { status: job.status, correlation_id: job.correlation_id } as T;
   }
   throw new Error("This action needs the hosted API.");
 }
 
-export async function previewPageUrl(jobId: string, page: number): Promise<string> {
+export async function previewPageUrl(
+  jobId: string,
+  page: number,
+): Promise<string> {
   const store = await state();
   const kind = store.kinds.get(jobId);
   if (!kind || page < 1 || page > 2) throw new Error("Sample page not found.");

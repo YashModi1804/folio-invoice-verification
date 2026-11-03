@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   CheckCheck,
@@ -32,44 +32,74 @@ export default function Intake({
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const active = useRef(true);
+  const inFlight = useRef(false);
+  const uploadAttempt = useRef<{ checksum: string; key: string } | null>(null);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
   async function upload(file?: File) {
-    if (!file || busy) return;
+    if (!file || inFlight.current) return;
+    if (!/\.(pdf|png|jpe?g|webp)$/i.test(file.name) || file.size === 0) {
+      onError("Choose a non-empty PDF, PNG, JPG or WEBP document.");
+      return;
+    }
     if (file.size > maxFileMb * 1024 * 1024) {
       onError(`Please choose a document smaller than ${maxFileMb} MB.`);
       return;
     }
+    inFlight.current = true;
     setBusy(true);
     try {
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        await file.arrayBuffer(),
+      );
+      const checksum = Array.from(new Uint8Array(digest), (byte) =>
+        byte.toString(16).padStart(2, "0"),
+      ).join("");
+      if (!active.current) return;
+      if (uploadAttempt.current?.checksum !== checksum) {
+        uploadAttempt.current = { checksum, key: crypto.randomUUID() };
+      }
       const data = new FormData();
       data.append("file", file);
-      onCreated(
-        await request<Job>("/documents", token, {
-          method: "POST",
-          body: data,
-          headers: { "Idempotency-Key": crypto.randomUUID() },
-        }),
-      );
+      const job = await request<Job>("/documents", token, {
+        method: "POST",
+        body: data,
+        headers: { "Idempotency-Key": uploadAttempt.current.key },
+      });
+      uploadAttempt.current = null;
+      if (active.current) onCreated(job);
     } catch (error) {
-      onError((error as Error).message);
+      if (active.current) onError((error as Error).message);
     } finally {
+      inFlight.current = false;
       setBusy(false);
       if (input.current) input.current.value = "";
     }
   }
   async function sample(kind: string) {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     try {
-      onCreated(
-        await request<Job>(`/samples/${kind}`, token, { method: "POST" }),
-      );
+      const job = await request<Job>(`/samples/${kind}`, token, {
+        method: "POST",
+      });
+      if (active.current) onCreated(job);
     } catch (error) {
-      onError((error as Error).message);
+      if (active.current) onError((error as Error).message);
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
   return (
-    <div className="intake">
+    <div className="intake" aria-busy={busy}>
       <section className="panel">
         <div className="panel-head">
           <div>
@@ -79,41 +109,51 @@ export default function Intake({
         </div>
         {publicPreview ? (
           <div className="dropzone preview-dropzone">
-            <div className="upload-icon"><ScanLine size={20} /></div>
+            <div className="upload-icon">
+              <ScanLine size={20} />
+            </div>
             <h3>Start with a synthetic invoice</h3>
-            <p>Choose a scenario below to inspect evidence, math checks, and review routing.</p>
-            <small>Private document uploads are available in the hosted API installation.</small>
+            <p>
+              Choose a scenario below to inspect evidence, math checks, and
+              review routing.
+            </p>
+            <small>
+              Private document uploads are available in the hosted API
+              installation.
+            </small>
           </div>
         ) : (
           <div
             className={`dropzone ${dragging ? "drag" : ""}`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            void upload(e.dataTransfer.files[0]);
-          }}
-        >
-          <div className="upload-icon">
-            <Upload size={20} />
-          </div>
-          <h3>Drop an invoice here</h3>
-          <p>PDF, PNG, JPG or WEBP · Up to {maxFileMb} MB / {maxPages} pages</p>
-          <button disabled={busy} onClick={() => input.current?.click()}>
-            <Upload size={14} />
-            {busy ? "Adding document…" : "Choose a document"}
-          </button>
-          <input
-            ref={input}
-            type="file"
-            hidden
-            accept=".pdf,.png,.jpg,.jpeg,.webp"
-            onChange={(e) => void upload(e.target.files?.[0])}
-          />
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              void upload(e.dataTransfer.files[0]);
+            }}
+          >
+            <div className="upload-icon">
+              <Upload size={20} />
+            </div>
+            <h3>Drop an invoice here</h3>
+            <p>
+              PDF, PNG, JPG or WEBP · Up to {maxFileMb} MB / {maxPages} pages
+            </p>
+            <button disabled={busy} onClick={() => input.current?.click()}>
+              <Upload size={14} />
+              {busy ? "Adding document…" : "Choose a document"}
+            </button>
+            <input
+              ref={input}
+              type="file"
+              hidden
+              accept=".pdf,.png,.jpg,.jpeg,.webp"
+              onChange={(e) => void upload(e.target.files?.[0])}
+            />
           </div>
         )}
         <p
@@ -126,14 +166,14 @@ export default function Intake({
           {publicPreview
             ? "Public preview: precomputed synthetic extraction. No inference, uploads, or server persistence."
             : provider === "fixture"
-            ? "Sample mode is active. Custom documents need a configured live provider."
-            : provider === "ollama"
-              ? "Local AI active. Documents stay on this machine; no cloud API call."
-              : provider === "groq"
-                ? "Groq capacity is reserved before extraction. Longer invoices are planned page by page and held for review if coverage is incomplete."
-              : fallback
-                ? `${provider === "groq" ? "Groq" : "Gemini"} processes uploads. If unavailable, local AI is attempted once and clearly labeled.`
-                : "Live provider active. Documents are sent to the configured model."}
+              ? "Sample mode is active. Custom documents need a configured live provider."
+              : provider === "ollama"
+                ? "Local AI active. Documents stay on this machine; no cloud API call."
+                : provider === "groq"
+                  ? "Groq capacity is reserved before extraction. Longer invoices are planned page by page and held for review if coverage is incomplete."
+                  : fallback
+                    ? `${provider === "groq" ? "Groq" : "Gemini"} processes uploads. If unavailable, local AI is attempted once and clearly labeled.`
+                    : "Live provider active. Documents are sent to the configured model."}
         </p>
       </section>
       <section className="panel">

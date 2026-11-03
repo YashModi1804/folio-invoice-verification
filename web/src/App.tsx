@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -14,26 +14,41 @@ import {
   Timer,
   X,
 } from "lucide-react";
-import { request } from "./api";
+import { ApiError, request } from "./api";
 import { labels, type Job } from "./types";
 import Intake from "./Intake";
 import Document from "./Document";
 import { PUBLIC_PREVIEW } from "./preview";
+import { matchesDocument, RequestScope } from "./workspace";
 
 export default function App() {
   const [token, setToken] = useState(
-    PUBLIC_PREVIEW ? "public-preview" : sessionStorage.getItem("folio-token") ?? localStorage.getItem("folio-guest-token") ?? "",
+    PUBLIC_PREVIEW
+      ? "public-preview"
+      : (sessionStorage.getItem("folio-token") ??
+          localStorage.getItem("folio-guest-token") ??
+          ""),
   );
   const [tokenInput, setTokenInput] = useState("");
   const [workspace, setWorkspace] = useState<"operator" | "guest">(
-    !PUBLIC_PREVIEW && !sessionStorage.getItem("folio-token") && localStorage.getItem("folio-guest-token") ? "guest" : "operator",
+    !PUBLIC_PREVIEW &&
+      !sessionStorage.getItem("folio-token") &&
+      localStorage.getItem("folio-guest-token")
+      ? "guest"
+      : "operator",
   );
   const [operatorLogin, setOperatorLogin] = useState(false);
   const [guestStarting, setGuestStarting] = useState(!PUBLIC_PREVIEW && !token);
+  const [guestError, setGuestError] = useState("");
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [reviewJobs, setReviewJobs] = useState<Job[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedSnapshot, setSelectedSnapshot] = useState<Job | null>(null);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
   const [view, setView] = useState<"all" | "review">("all");
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [query, setQuery] = useState("");
   const [provider, setProvider] = useState("fixture");
   const [fallback, setFallback] = useState(false);
@@ -41,94 +56,248 @@ export default function App() {
   const [maxFileMb, setMaxFileMb] = useState(20);
   const [temporaryDemo, setTemporaryDemo] = useState(false);
   const [ready, setReady] = useState(false);
+  const loads = useRef(new RequestScope());
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
+  const guestRequest = useRef<Promise<void> | null>(null);
+  const loginRequest = useRef(new RequestScope());
+  const workspaceRef = useRef(workspace);
+  workspaceRef.current = workspace;
+
+  function resetWorkspace() {
+    tokenRef.current = "";
+    loads.current.cancel();
+    setJobs([]);
+    setReviewJobs([]);
+    setSelected(null);
+    setSelectedSnapshot(null);
+    setReady(false);
+    setQuery("");
+    setView("all");
+    setError("");
+    setLoadError("");
+  }
+
+  function openJob(job: Job) {
+    selectedRef.current = job.job_id;
+    setSelectedSnapshot(job);
+    setSelected(job.job_id);
+  }
+
   const startGuest = useCallback(async () => {
+    if (guestRequest.current) return guestRequest.current;
     setGuestStarting(true);
-    try {
-      const session = await request<{ token: string }>("/guest-sessions", "", { method: "POST" });
-      localStorage.setItem("folio-guest-token", session.token);
-      setWorkspace("guest");
-      setToken(session.token);
-      setOperatorLogin(false);
-      setError("");
-    } catch {
-      setOperatorLogin(true);
-    } finally {
-      setGuestStarting(false);
-    }
+    setGuestError("");
+    setOperatorLogin(false);
+    loginRequest.current.cancel();
+    guestRequest.current = (async () => {
+      try {
+        const saved = localStorage.getItem("folio-guest-token");
+        const session = await (saved
+          ? Promise.resolve({ token: saved })
+          : request<{ token: string }>("/guest-sessions", "", {
+              method: "POST",
+            }));
+        localStorage.setItem("folio-guest-token", session.token);
+        setWorkspace("guest");
+        setToken(session.token);
+        setError("");
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          setOperatorLogin(true);
+        } else {
+          setGuestError((error as Error).message);
+        }
+      } finally {
+        setGuestStarting(false);
+        guestRequest.current = null;
+      }
+    })();
+    return guestRequest.current;
   }, []);
   useEffect(() => {
-    if (!PUBLIC_PREVIEW && !token && !operatorLogin) void startGuest();
-  }, [token, operatorLogin, startGuest]);
-  const load = useCallback(async () => {
-    if (!token) return;
-    try {
-      const [items, config] = await Promise.all([
-        request<Job[]>("/jobs", token),
-        request<{
-          provider: string;
-          local_fallback_enabled: boolean;
-          max_pages: number;
-          max_file_mb: number;
-          workspace?: "operator" | "guest";
-          temporary_demo?: boolean;
-        }>("/config", token),
-      ]);
-      setJobs(items);
-      setProvider(config.provider);
-      setWorkspace(config.workspace ?? "operator");
-      setFallback(config.local_fallback_enabled);
-      setMaxPages(config.max_pages);
-      setMaxFileMb(config.max_file_mb ?? 20);
-      setTemporaryDemo(Boolean(config.temporary_demo));
-      setReady(true);
-    } catch (error) {
-      if (workspace === "guest" && (error as Error).message === "Authentication required") {
-        localStorage.removeItem("folio-guest-token");
-        setToken("");
-        setJobs([]);
-        setSelected(null);
-        setReady(false);
-      } else {
-        setError((error as Error).message);
+    if (!PUBLIC_PREVIEW && !token && !operatorLogin && !guestError)
+      void startGuest();
+  }, [token, operatorLogin, guestError, startGuest]);
+  const load = useCallback(
+    async (replace = false) => {
+      if (!token || tokenRef.current !== token) return;
+      const controller = loads.current.start(replace);
+      if (!controller) return;
+      const options = { signal: controller.signal };
+      try {
+        const [items, reviews, config] = await Promise.all([
+          request<Job[]>("/jobs", token, options),
+          request<Job[]>("/review-tasks", token, options),
+          request<{
+            provider: string;
+            local_fallback_enabled: boolean;
+            max_pages: number;
+            max_file_mb: number;
+            workspace?: "operator" | "guest";
+            temporary_demo?: boolean;
+          }>("/config", token, options),
+        ]);
+        const selectedId = selectedRef.current;
+        let snapshot: Job | null = null;
+        if (
+          selectedId &&
+          !items.some((item) => item.job_id === selectedId) &&
+          !reviews.some((item) => item.job_id === selectedId)
+        ) {
+          try {
+            snapshot = await request<Job>(
+              `/jobs/${selectedId}`,
+              token,
+              options,
+            );
+          } catch (error) {
+            if (!(error instanceof ApiError && error.status === 404))
+              throw error;
+          }
+        }
+        if (!loads.current.owns(controller) || tokenRef.current !== token)
+          return;
+        if (selectedRef.current === selectedId) {
+          setSelectedSnapshot(snapshot);
+          if (
+            selectedId &&
+            !snapshot &&
+            !items.some((item) => item.job_id === selectedId) &&
+            !reviews.some((item) => item.job_id === selectedId)
+          ) {
+            setSelected(null);
+            setError("This document is no longer available in your workspace.");
+          }
+        }
+        setJobs(items);
+        setReviewJobs(reviews);
+        setProvider(config.provider);
+        setWorkspace(config.workspace ?? "operator");
+        setFallback(config.local_fallback_enabled);
+        setMaxPages(config.max_pages);
+        setMaxFileMb(config.max_file_mb ?? 20);
+        setTemporaryDemo(Boolean(config.temporary_demo));
+        setReady(true);
+        setLoadError("");
+      } catch (error) {
+        if (!loads.current.owns(controller) || tokenRef.current !== token)
+          return;
+        if (error instanceof ApiError && error.status === 401) {
+          if (workspaceRef.current === "guest")
+            localStorage.removeItem("folio-guest-token");
+          else {
+            sessionStorage.removeItem("folio-token");
+            setOperatorLogin(true);
+          }
+          setToken("");
+          setJobs([]);
+          setReviewJobs([]);
+          setSelected(null);
+          setSelectedSnapshot(null);
+          setReady(false);
+        } else {
+          setLoadError((error as Error).message);
+        }
+      } finally {
+        loads.current.finish(controller);
       }
-    }
-  }, [token, workspace]);
+    },
+    [token],
+  );
   useEffect(() => {
     void load();
+    return () => loads.current.cancel();
   }, [load]);
-  const hasPendingJob = jobs.some((job) => ["QUEUED", "PROCESSING"].includes(job.status));
+  const hasPendingJob = jobs.some((job) =>
+    ["QUEUED", "PROCESSING"].includes(job.status),
+  );
   useEffect(() => {
-    const timer = setInterval(() => void load(), hasPendingJob ? 1500 : 15000);
-    return () => clearInterval(timer);
+    const refreshVisible = () => {
+      if (!document.hidden) void load();
+    };
+    const timer = setInterval(refreshVisible, hasPendingJob ? 1500 : 15000);
+    document.addEventListener("visibilitychange", refreshVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshVisible);
+    };
   }, [load, hasPendingJob]);
   async function login(event: React.FormEvent) {
     event.preventDefault();
     setError("");
+    const controller = loginRequest.current.start();
+    if (!controller) return;
+    const submittedToken = tokenInput.trim();
     try {
-      await request("/config", tokenInput);
-      sessionStorage.setItem("folio-token", tokenInput);
+      await request("/config", submittedToken, { signal: controller.signal });
+      if (!loginRequest.current.owns(controller)) return;
+      resetWorkspace();
+      sessionStorage.setItem("folio-token", submittedToken);
       setWorkspace("operator");
-      setToken(tokenInput);
+      setToken(submittedToken);
+      setTokenInput("");
     } catch (error) {
-      setError((error as Error).message);
+      if (loginRequest.current.owns(controller))
+        setError((error as Error).message);
+    } finally {
+      loginRequest.current.finish(controller);
     }
   }
-  const reviewCount = jobs.filter(
-    (j) => j.status === "REQUIRES_HUMAN_REVIEW",
-  ).length;
+  const reviewCount = reviewJobs.length;
   const approved = jobs.filter((j) =>
     ["AUTO_APPROVED", "HUMAN_APPROVED"].includes(j.status),
   ).length;
-  const filtered = jobs.filter(
-    (j) =>
-      (view === "all" || j.status === "REQUIRES_HUMAN_REVIEW") &&
-      `${j.filename} ${j.summary?.vendor_name ?? ""}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
+  const filtered = (view === "all" ? jobs : reviewJobs).filter((job) =>
+    matchesDocument(job, query),
   );
-  const current = jobs.find((j) => j.job_id === selected);
-  if (guestStarting && !token)
-    return <div className="login"><div className="eyebrow">Folio / Document verification</div><p>Opening your private demo workspace…</p></div>;
+  const current =
+    jobs.find((j) => j.job_id === selected) ??
+    reviewJobs.find((j) => j.job_id === selected) ??
+    (selectedSnapshot?.job_id === selected ? selectedSnapshot : undefined);
+  if ((!token && !operatorLogin) || (token && !ready)) {
+    const connectionError = guestError || loadError || error;
+    return (
+      <div className="login">
+        <section className="connection-card" aria-live="polite">
+          <div className="eyebrow">Folio / Document verification</div>
+          <h1>
+            {connectionError ? "Let's reconnect." : "Opening your workspace."}
+          </h1>
+          <p>
+            {connectionError ||
+              "Loading your documents and review queue. A sleeping demo service may take a moment to respond."}
+          </p>
+          {connectionError && (
+            <button
+              className="primary"
+              onClick={() => {
+                setError("");
+                setLoadError("");
+                if (token) void load(true);
+                else void startGuest();
+              }}
+            >
+              Try again
+            </button>
+          )}
+          {!guestStarting && (
+            <button
+              className="ghost"
+              onClick={() => {
+                resetWorkspace();
+                sessionStorage.removeItem("folio-token");
+                setToken("");
+                setOperatorLogin(true);
+              }}
+            >
+              Operator access
+            </button>
+          )}
+        </section>
+      </div>
+    );
+  }
   if (!token)
     return (
       <div className="login">
@@ -157,7 +326,11 @@ export default function App() {
             Open workspace
             <ArrowRight size={16} />
           </button>
-          <button className="ghost" type="button" onClick={() => void startGuest()}>
+          <button
+            className="ghost"
+            type="button"
+            onClick={() => void startGuest()}
+          >
             Explore as guest
           </button>
           <small>
@@ -184,7 +357,9 @@ export default function App() {
           </span>
         </div>
         <div className="workspace-label">
-          {workspace === "guest" ? "PRIVATE DEMO WORKSPACE" : "OPERATIONS WORKSPACE"}
+          {workspace === "guest"
+            ? "PRIVATE DEMO WORKSPACE"
+            : "OPERATIONS WORKSPACE"}
         </div>
         <nav className="nav">
           <button
@@ -214,7 +389,11 @@ export default function App() {
           <br />
           Every correction leaves a trail.
           <a
-            href={PUBLIC_PREVIEW ? "https://github.com/YashModi1804/folio-invoice-verification" : "/docs"}
+            href={
+              PUBLIC_PREVIEW
+                ? "https://github.com/YashModi1804/folio-invoice-verification"
+                : "/docs"
+            }
             target="_blank"
             rel="noreferrer"
           >
@@ -243,22 +422,24 @@ export default function App() {
                 ? "PRIVATE GUEST DEMO"
                 : provider === "fixture"
                   ? "SAMPLE WORKSPACE"
-                : provider === "ollama"
-                  ? "LOCAL AI WORKSPACE"
-                  : "LIVE WORKSPACE"}
+                  : provider === "ollama"
+                    ? "LOCAL AI WORKSPACE"
+                    : "LIVE WORKSPACE"}
             </span>
-            <span className="avatar">{workspace === "guest" ? "GU" : "OP"}</span>
+            <span className="avatar">
+              {workspace === "guest" ? "GU" : "OP"}
+            </span>
             {!PUBLIC_PREVIEW && (
               <button
                 className="ghost"
-                aria-label={workspace === "guest" ? "Operator access" : "Sign out"}
+                aria-label={
+                  workspace === "guest" ? "Operator access" : "Sign out"
+                }
                 onClick={() => {
                   sessionStorage.removeItem("folio-token");
+                  resetWorkspace();
                   setOperatorLogin(true);
                   setToken("");
-                  setReady(false);
-                  setSelected(null);
-                  setJobs([]);
                 }}
               >
                 <LogOut size={15} />
@@ -272,13 +453,18 @@ export default function App() {
             <div className="preview-banner" role="status">
               <strong>Public sample preview</strong>
               <span>
-                Synthetic invoices only · No live AI or server storage · Review decisions reset on refresh
+                Synthetic invoices only · No live AI or server storage · Review
+                decisions reset on refresh
               </span>
             </div>
           )}
           {(temporaryDemo || workspace === "guest") && !PUBLIC_PREVIEW && (
             <div className="preview-banner" role="status">
-              <strong>{workspace === "guest" ? "Private guest demo" : "Temporary live demo"}</strong>
+              <strong>
+                {workspace === "guest"
+                  ? "Private guest demo"
+                  : "Temporary live demo"}
+              </strong>
               <span>
                 {workspace === "guest"
                   ? "Shared synthetic samples stay available · Private uploads and reviews auto-delete after two hours when the service is awake"
@@ -286,13 +472,16 @@ export default function App() {
               </span>
             </div>
           )}
-          {error && (
+          {(error || loadError) && (
             <div className="error" role="alert">
-              <span>{error}</span>
+              <span>{error || loadError}</span>
               <button
                 className="ghost"
                 aria-label="Dismiss error"
-                onClick={() => setError("")}
+                onClick={() => {
+                  setError("");
+                  setLoadError("");
+                }}
               >
                 <X size={14} />
               </button>
@@ -304,7 +493,7 @@ export default function App() {
               job={current}
               token={token}
               back={() => setSelected(null)}
-              refresh={() => void load()}
+              refresh={() => load(true)}
               onError={setError}
             />
           ) : (
@@ -327,9 +516,12 @@ export default function App() {
                   className="primary"
                   onClick={() => {
                     setView("all");
-                    document
-                      .getElementById("intake")
-                      ?.scrollIntoView({ behavior: "smooth" });
+                    setQuery("");
+                    requestAnimationFrame(() =>
+                      document
+                        .getElementById("intake")
+                        ?.scrollIntoView({ behavior: "smooth" }),
+                    );
                   }}
                 >
                   <Plus size={15} />
@@ -385,8 +577,19 @@ export default function App() {
                     maxFileMb={maxFileMb}
                     onError={setError}
                     onCreated={(job) => {
-                      setJobs((items) => [job, ...items]);
-                      setSelected(job.job_id);
+                      if (tokenRef.current !== token) return;
+                      loads.current.cancel();
+                      setJobs((items) => [
+                        job,
+                        ...items.filter((item) => item.job_id !== job.job_id),
+                      ]);
+                      if (job.status === "REQUIRES_HUMAN_REVIEW") {
+                        setReviewJobs((items) => [
+                          job,
+                          ...items.filter((item) => item.job_id !== job.job_id),
+                        ]);
+                      }
+                      openJob(job);
                       setError("");
                     }}
                   />
@@ -400,7 +603,7 @@ export default function App() {
                     </h2>
                     <p>
                       {view === "review"
-                        ? "Resolve discrepancies and preserve the evidence."
+                        ? "Most discrepancies first, then oldest received."
                         : "Each document, its decision, and the path it took."}
                     </p>
                   </div>
@@ -468,7 +671,7 @@ export default function App() {
                             <button
                               className="ghost"
                               aria-label={`Open ${job.filename}`}
-                              onClick={() => setSelected(job.job_id)}
+                              onClick={() => openJob(job)}
                             >
                               <ArrowUpRight size={16} />
                             </button>
@@ -488,6 +691,11 @@ export default function App() {
                             : PUBLIC_PREVIEW
                               ? "Select a synthetic sample to explore the workflow."
                               : "Your register starts here. Try a sample or upload your first invoice."}
+                      {query.trim() && (
+                        <button className="ghost" onClick={() => setQuery("")}>
+                          Clear search
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

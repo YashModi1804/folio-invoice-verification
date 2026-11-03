@@ -18,7 +18,7 @@
   font-synthesis: none;
   font-size: 14px;
   --ink: #183639;
-  --muted: #74817e;
+  --muted: #60726b;
   --line: #e1e6df;
   --green: #32745e;
   --amber: #9a661b;
@@ -48,6 +48,15 @@ button {
 button:disabled {
   opacity: 0.45;
   cursor: wait;
+}
+.field-value button:disabled {
+  cursor: default;
+  opacity: 0.8;
+}
+main,
+.document-grid > div,
+.heading > div {
+  min-width: 0;
 }
 button:focus-visible,
 a:focus-visible,
@@ -273,6 +282,9 @@ small {
   font-size: 13px;
   color: var(--muted);
 }
+.heading h1 {
+  overflow-wrap: anywhere;
+}
 .heading .eyebrow {
   margin-bottom: 6px;
 }
@@ -337,6 +349,8 @@ small {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 .panel-head p {
   font-size: 11px;
@@ -485,6 +499,10 @@ tbody tr:hover {
   color: var(--muted);
   font-size: 12px;
 }
+.empty button {
+  display: flex;
+  margin: 12px auto 0;
+}
 .error {
   padding: 14px 18px;
   margin-bottom: 20px;
@@ -578,6 +596,33 @@ tbody tr:hover {
 .source-toolbar button {
   padding: 5px;
 }
+.source-expand {
+  display: inline-flex;
+  padding: 6px;
+  border-radius: 5px;
+}
+.source-message {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 24px 0;
+}
+.record-switch {
+  display: flex;
+  gap: 6px;
+  padding: 12px 22px;
+  border-bottom: 1px solid var(--line);
+  background: #fafcf8;
+}
+.record-switch button {
+  flex: 1;
+  font-size: 11px;
+}
+.record-switch button[aria-pressed="true"] {
+  color: white;
+  background: var(--ink);
+  border-color: var(--ink);
+}
 .fields {
   padding: 8px 22px;
 }
@@ -600,6 +645,8 @@ tbody tr:hover {
 .field-value {
   text-align: right;
   font-size: 13px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .field-value button {
   padding: 3px 5px;
@@ -607,6 +654,15 @@ tbody tr:hover {
   color: var(--muted);
   margin-left: 7px;
   border: 0;
+}
+.reviewed-field {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 3px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  background: #edf2eb;
+  color: #466b51;
 }
 .field input {
   border: 1px solid #c7d5c9;
@@ -680,6 +736,17 @@ tbody tr:hover {
   margin-top: 12px;
   justify-content: flex-end;
 }
+.review-form small {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+}
+.review-error {
+  color: #934830;
+  padding: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
 .audit {
   padding: 6px 22px;
 }
@@ -734,12 +801,20 @@ tbody tr:hover {
   padding: 24px;
   background: #172f32;
 }
-.login form {
+.login form,
+.connection-card {
   background: #fafbf7;
   border-radius: 12px;
   padding: 38px;
   max-width: 420px;
   width: 100%;
+}
+.connection-card h1 {
+  font-size: 36px;
+  margin-top: 12px;
+}
+.connection-card button + button {
+  margin-top: 8px;
 }
 .login p {
   font-size: 13px;
@@ -897,11 +972,83 @@ tbody tr:hover {
   .footer {
     gap: 15px;
     line-height: 1.5;
+    flex-wrap: wrap;
   }
   .document-grid {
     display: block;
   }
   .document-grid > div + div {
     margin-top: 20px;
+  }
+}
+@media (max-width: 480px) {
+  .sidebar {
+    gap: 10px;
+    padding: 12px;
+  }
+  .nav {
+    flex: 1;
+    justify-content: flex-end;
+  }
+  .nav button {
+    padding: 8px 6px;
+    gap: 5px;
+  }
+  .topbar {
+    min-height: 55px;
+    height: auto;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .crumb > .muted,
+  .crumb > svg,
+  .avatar {
+    display: none;
+  }
+  .operator {
+    gap: 5px;
+  }
+  .operator .ghost {
+    padding: 6px;
+    font-size: 11px;
+  }
+  .heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .heading h1 {
+    font-size: 32px;
+  }
+  .panel-head,
+  .fields,
+  .review-form,
+  .check,
+  .record-switch {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .field input {
+    width: min(170px, 42vw);
+  }
+  .source-stage {
+    min-height: 280px;
+    padding: 10px;
+  }
+  .source-toolbar {
+    padding: 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .stepper,
+  .review-form .toolbar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .review-form .toolbar button {
+    flex: 1;
+  }
+  .search {
+    max-width: none;
+    width: 100%;
   }
 }
