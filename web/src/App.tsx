@@ -700,8 +700,9 @@ export default function App() {
                   )}
                 </div>
                 <div className="table-footer">
-                  {filtered.length} documents · Original extractions are
-                  preserved after review
+                  {filtered.length}{" "}
+                  {filtered.length === 1 ? "document" : "documents"} · Original
+                  extractions are preserved after review
                 </div>
               </section>
             </>

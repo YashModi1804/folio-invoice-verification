@@ -627,7 +627,9 @@ export default function Document({
                                 validEvidence(sourceField, job.page_count)
                                   ? reviewedView
                                     ? "View the original extraction citation; the reviewed value may differ"
-                                    : "Model confidence, not calibrated probability"
+                                    : job.mode === "fixture"
+                                      ? "Synthetic fixture confidence; no model was called"
+                                      : "Model confidence, not calibrated probability"
                                   : "No source citation available for this field"
                               }
                               aria-label={`View ${reviewedView ? "original " : ""}${humanize(name)} source evidence`}

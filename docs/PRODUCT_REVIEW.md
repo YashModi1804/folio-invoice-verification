@@ -53,6 +53,10 @@ Focused backend regressions and frontend tests passed during implementation.
 Final test totals and deployed status belong in the release verification report;
 this decision memo does not substitute for that evidence.
 
+The [release verification report](REVIEW_2026_11.md) now records passed local checks,
+Ubuntu CI and the deployed synthetic workflow. The scoped sales-demo release passed
+these gates; hosting continuity and client-production validation remain separate work.
+
 ## Next work, in priority order
 
 1. **Resolve live-demo continuity before database expiry.** Preserve the static
