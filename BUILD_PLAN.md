@@ -98,3 +98,18 @@ Verify with Python and browser regressions, frontend tests/builds, dependency au
 fresh migrations and a local synthetic workflow. Publish the tested changes and
 verify deployment health under the owner's current authorization. Existing free
 hosting sleep and database expiry are explicit limitations; do not add paid services.
+
+## Follow-up — PM-led sample exploration and recovery
+
+Use [the core team charter](docs/CORE_TEAM.md) for responsibilities, direct
+engineering/design coordination, acceptance criteria and the ranked backlog.
+The completed November release remains the baseline; do not repeat its work.
+
+- Reopen each guest's canonical sample instead of creating copies until the sample
+  allowance is exhausted. Preserve original extraction, existing review decisions,
+  workspace ownership and operator sample-run behavior. Label guest cards clearly.
+- Offer the fixed public sample-preview link when live connection or guest
+  admission fails, with truthful fixture/persistence copy and no credential forwarding.
+- Verify focused regressions, integrated tests and browser behavior before recording
+  results or publishing. No new provider calls, paid services, sample resets or
+  changes to guest access/retention policy are part of this follow-up.
